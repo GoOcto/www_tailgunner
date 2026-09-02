@@ -378,11 +378,17 @@ canvas.width = FIXED_W;
 canvas.height = FIXED_H;
 paper.setup(canvas);
 
-paper.view.viewSize = new paper.Size(FIXED_W, FIXED_H);
+// Paper.js's CanvasView writes inline canvas.style.width/height whenever
+// viewSize is set (to compensate for devicePixelRatio). That inline style
+// overrides our CSS, which is what lets the canvas scale to fit its
+// container. Clear it after every viewSize change so CSS stays in control.
+function keepCanvasCssScalable() {
+    canvas.style.width = '';
+    canvas.style.height = '';
+}
 
-paper.view.onResize = () => {
-    paper.view.viewSize = new paper.Size(FIXED_W, FIXED_H);
-};
+paper.view.viewSize = new paper.Size(FIXED_W, FIXED_H);
+keepCanvasCssScalable();
 
 const controller = new AnimationController();
 
