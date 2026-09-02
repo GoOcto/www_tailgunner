@@ -371,6 +371,61 @@ class Reticle {
     }
 }
 
+class DeltaShot {
+    constructor(startPoint, targetPoint) {
+        this.start = startPoint.clone();
+        this.target = targetPoint.clone();
+        this.progress = 0;
+        this.duration = 0.6; // seconds to travel from corner to reticle
+
+        const dir = this.target.subtract(this.start);
+        this.angle = dir.angle; // paper.js: degrees, 0 = +x axis
+
+        this.baseSize = 22;
+
+        this.path = new paper.Path({
+            strokeColor: new paper.Color(beamColor),
+            strokeWidth: 1.5,
+            closed: true
+        });
+
+        this.rebuild();
+    }
+
+    rebuild() {
+        const pos = this.start.add(this.target.subtract(this.start).multiply(this.progress));
+        const scale = Math.max(0.05, 1 - this.progress);
+        const size = this.baseSize * scale;
+
+        // Delta (triangle) shape pointing along direction of travel.
+        // Base points defined relative to pointing toward +x, then rotated.
+        const tip = new paper.Point(size, 0);
+        const backLeft = new paper.Point(-size * 0.6, size * 0.5);
+        const backRight = new paper.Point(-size * 0.6, -size * 0.5);
+
+        this.path.removeSegments();
+        this.path.add(pos.add(tip.rotate(this.angle, [0, 0])));
+        this.path.add(pos.add(backLeft.rotate(this.angle, [0, 0])));
+        this.path.add(pos.add(backRight.rotate(this.angle, [0, 0])));
+        this.path.closed = true;
+    }
+
+    update(deltaTime) {
+        this.progress += deltaTime / this.duration;
+        if (this.progress >= 1) {
+            this.progress = 1;
+            this.rebuild();
+            return true; // reached target, ready for removal
+        }
+        this.rebuild();
+        return false;
+    }
+
+    destroy() {
+        this.path.remove();
+    }
+}
+
 class AnimationController {
     constructor() {
         this.starField = new StarField();
@@ -381,6 +436,10 @@ class AnimationController {
         this.waveTimer = 0;
         this.net = new Net();
         this.reticle = new Reticle();        
+
+        this.activeShots = [];
+        this.reloadTimeSecs = 0.1;
+        this.reloadTimer = 0;
 
         this.startWave();
 
@@ -394,8 +453,35 @@ class AnimationController {
             );
             this.reticle.moveTo(mousePos);
         });
+
+        canvas.addEventListener('mouseleave', () => {
+            this.reticle.group.visible = false;
+        });
+        canvas.addEventListener('mouseenter', () => {
+            this.reticle.group.visible = true;
+        });
+
+        canvas.addEventListener('mousedown', () => {
+            this.fireWeapon();
+        });
     }
-    
+
+    fireWeapon() {
+        if (this.reloadTimer > 0) return;
+
+        const viewW = paper.view.size.width;
+        const viewH = paper.view.size.height;
+        const target = this.reticle.pos;
+
+        const bottomLeft = new paper.Point(0, viewH);
+        const bottomRight = new paper.Point(viewW, viewH);
+
+        this.activeShots.push(new DeltaShot(bottomLeft, target));
+        this.activeShots.push(new DeltaShot(bottomRight, target));
+
+        this.reloadTimer = this.reloadTimeSecs;
+    }
+
     startWave() {
         const sharedSpeed = Math.random() * 10 + 10;
         const sharedModel = Vehicles[Math.floor(Math.random() * Vehicles.length)];
@@ -432,6 +518,19 @@ class AnimationController {
         
         if (this.activeShips.length === 0 && this.spawnQueue.length === 0) {
             this.startWave();
+        }
+
+        if (this.reloadTimer > 0) {
+            this.reloadTimer = Math.max(0, this.reloadTimer - event.delta);
+        }
+
+        for (let i = this.activeShots.length - 1; i >= 0; i--) {
+            const shot = this.activeShots[i];
+            const reachedTarget = shot.update(event.delta);
+            if (reachedTarget) {
+                shot.destroy();
+                this.activeShots.splice(i, 1);
+            }
         }
     }
     
