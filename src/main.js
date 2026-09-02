@@ -1,5 +1,7 @@
 import paper from 'paper';
 
+const beamColor = '#88dddd';
+
 const Vehicles = [
 	{
 		"model": "Condor",
@@ -105,7 +107,7 @@ class StarField {
         const shape = new paper.Path.Circle({
             center: new paper.Point(-1000, -1000),
             radius: 1, 
-            fillColor: 'white',
+            fillColor: beamColor,
         });
 
         return { x, y, z, baseRadius, shape };
@@ -152,7 +154,7 @@ class VectorStarfighter {
 
         this.edges.forEach(() => {
             this.lines.push(new paper.Path.Line({
-                strokeColor: '#cccccc',
+                strokeColor: beamColor,
                 strokeWidth: 0.8
             }));
         });
@@ -287,7 +289,7 @@ class Net {
         for (let row = 0; row < totalRows; row++) {
             for (let col = 0; col < totalCols; col++) {
 				const path = new paper.Path({
-					strokeColor: '#dddddd',
+					strokeColor: beamColor,
 					strokeWidth: 1.5,
 					strokeCap: 'round',
 					strokeJoin: 'round',
@@ -314,6 +316,55 @@ class Net {
     }
 }
 
+class Reticle {
+    constructor() {
+        this.group = new paper.Group();
+        this.rebuild();
+    }
+
+    rebuild() {
+        this.group.removeChildren();
+        const center = paper.view.center;
+        const color = new paper.Color(beamColor);
+
+        const axes = new paper.CompoundPath({
+            children: [
+                new paper.Path.Line(center.add([0, -30]), center.add([0, 30])),
+                new paper.Path.Line(center.add([-30, 0]), center.add([30, 0]))
+            ],
+            strokeColor: color,
+            strokeWidth: 1
+        });
+
+        const ticksData = [
+            { pos: 10, len: 12 },
+            { pos: 20, len: 24 },
+        ];
+        
+        const tickPaths = [];
+        ticksData.forEach(tick => {
+            [1, -1].forEach(dir => {
+                tickPaths.push(new paper.Path.Line(
+                    center.add([-tick.len / 2, tick.pos * dir]),
+                    center.add([tick.len / 2, tick.pos * dir])
+                ));
+                tickPaths.push(new paper.Path.Line(
+                    center.add([tick.pos * dir, -tick.len / 2]),
+                    center.add([tick.pos * dir, tick.len / 2])
+                ));
+            });
+        });
+
+        const allTicks = new paper.CompoundPath({
+            children: tickPaths,
+            strokeColor: color,
+            strokeWidth: 1
+        });
+
+        this.group.addChildren([axes, allTicks]);
+    }
+}
+
 class AnimationController {
     constructor() {
         this.starField = new StarField();
@@ -323,7 +374,8 @@ class AnimationController {
         this.spawnQueue = [];
         this.waveTimer = 0;
         this.net = new Net();
-        
+		this.reticle = new Reticle();        
+
         this.startWave();
     }
     
@@ -368,6 +420,7 @@ class AnimationController {
     
     onResize() {
         if (this.net.group.visible) this.net.rebuild();
+		this.reticle.rebuild();			
     }
 }
 
