@@ -1,82 +1,68 @@
 import paper from 'paper';
+import { DIGITS_DATA, Vehicles } from './assets.js';
 
 const beamColor = '#88dddd';
 
-const Vehicles = [
-	{
-		"model": "Condor",
-		"type": "VectorWireframe",
-		"vertices": [
-			{ "id": 0, "x": 0.0, "y": 1.0, "z": 0.0 },   
-			{ "id": 1, "x": 0.0, "y":-0.2, "z": 0.0 },   
-			{ "id": 2, "x": 4.0, "y":-1.0, "z": 4.0 },   
-			{ "id": 3, "x": 1.5, "y": 0.0, "z": 5.0 },   
-			{ "id": 4, "x":-1.5, "y": 0.0, "z": 5.0 },   
-			{ "id": 5, "x":-4.0, "y":-1.0, "z": 4.0 },   
-			{ "id": 6, "x": 1.0, "y": 0.0, "z":-0.5 },   
-			{ "id": 7, "x":-1.0, "y": 0.0, "z":-0.5 },   
-			{ "id": 8, "x": 0.0, "y": 0.0, "z":-2.0 },   
-		],
-		"edges": [
-			[0,1], [1,3], [3,0], [3,4], [4,1], [4,0], 
-			[1,2], [2,3], [1,5], [5,4],
-			[0,6], [6,1], [1,7], [7,0], 
-			[1,8], [0,8], [6,8], [7,8]
-		]
-	},
-	{
-		"model": "Eagle",
-		"type": "VectorWireframe",
-		"vertices": [
-			{ "id": 0, "x": 0.0, "y": 0.0, "z": 0.0 },   
-			{ "id": 1, "x": 1.0, "y": 0.0, "z":-1.0 },   
-			{ "id": 2, "x": 0.0, "y":-1.0, "z":-1.0 },   
-			{ "id": 3, "x":-1.0, "y": 0.0, "z":-1.0 },   
-			{ "id": 4, "x": 0.0, "y": 1.0, "z":-1.0 },   
-			{ "id": 5, "x": 0.0, "y": 0.0, "z":-3.0 },   
-			{ "id": 6, "x": 4.0, "y": 2.0, "z": 4.5 },   
-			{ "id": 7, "x": 1.2, "y": 0.0, "z": 5.5 },   
-			{ "id": 8, "x": 0.8, "y":-0.5, "z": 5.3 },   
-			{ "id": 9, "x":-0.8, "y":-0.5, "z": 5.3 },   
-			{ "id":10, "x":-1.2, "y": 0.0, "z": 5.5 },   
-			{ "id":11, "x":-4.0, "y": 2.0, "z": 4.5 },   
-		],
-		"edges": [
-			[0, 1], [0, 2], [0, 3], [0, 4], 
-			[1, 5], [2, 5], [3, 5], [4, 5], 
-			[0, 6], [6, 7], [7,8], [8,9], [9,10], [10,11],
-			[10,7], [7,0], [8,0], [9,0], [10,0], [11,0]
-		]
-	},
-	{
-		"model": "Stingray",
-		"type": "VectorWireframe",
-		"vertices": [
-			{ "id": 0, "x": 0.0, "y": 0.0, "z":-3.0 },   
-			{ "id": 1, "x": 2.8, "y": 0.0, "z":-2.0 },   
-			{ "id": 2, "x": 2.0, "y":-1.0, "z":-1.0 },   
-			{ "id": 3, "x":-2.0, "y":-1.0, "z":-1.0 },   
-			{ "id": 4, "x":-2.8, "y": 0.0, "z":-2.3 },   
-			{ "id": 5, "x": 0.0, "y":-1.0, "z":-1.5 },   
-			{ "id": 6, "x": 1.4, "y":-1.0, "z": 4.0 },   
-			{ "id": 7, "x": 0.0, "y":-1.0, "z": 4.6 },   
-			{ "id": 8, "x":-1.4, "y":-1.0, "z": 4.0 },   
-			{ "id":9, "x": 2.2, "y":-1.8, "z": 4.0 },   
-			{ "id":10, "x": 2.2, "y":-1.8, "z": 7.0 },   
-			{ "id":11, "x": 1.4, "y":-1.0, "z": 7.0 },   
-			{ "id":12, "x":-2.2, "y":-1.8, "z": 4.0 },   
-			{ "id":13, "x":-2.2, "y":-1.8, "z": 7.0 },   
-			{ "id":14, "x":-1.4, "y":-1.0, "z": 7.0 },   
-		],
-		"edges": [
-			[0, 1], [1,2], [2,5], [5,0], [0, 4], [4,3], [3,5], 
-			[1,6], [6,2], [3,8], [8,4], [6,7], [7,8],
-			[6,9], [9,10],[10,11],[11,6],
-			[8,12],[12,13],[13,14],[14,8]
-		]
-	}
-];
+class VectorDigits {
+    constructor() {
+        this.group = new paper.Group();
+        this.rebuild();
+    }
 
+    renderString(str, startX, startY, digitWidth = 20, digitHeight = 40, spacing = 8) {
+        const scaleX = digitWidth / 2;
+        const scaleY = digitHeight / 4;
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str[i];
+            const points = DIGITS_DATA[char];
+            if (!points) continue;
+
+            const xOffset = startX + i * (digitWidth + spacing);
+
+            const path = new paper.Path({
+                strokeColor: beamColor,
+                strokeWidth: 1,
+                strokeCap: 'square',
+                strokeJoin: 'miter'
+            });
+
+            points.forEach(pt => {
+                path.add(new paper.Point(
+                    xOffset + pt[0] * scaleX,
+                    startY + pt[1] * scaleY
+                ));
+            });
+
+            this.group.addChild(path);
+        }
+    }
+
+    rebuild() {
+        this.group.removeChildren();
+
+        const viewW = paper.view.size.width;
+        const padding = 30;
+        const digitW = 18;
+        const digitH = 30;
+        const spacing = 8;
+		const midTop = 6;
+		const sideTop = midTop + 2*spacing + digitH;
+
+        const leftStr = "173";
+        this.renderString(leftStr, padding, sideTop, digitW, digitH, spacing);
+
+        const centerStr = "46";
+        const centerWidth = centerStr.length * digitW + (centerStr.length - 1) * spacing;
+        const centerX = (viewW - centerWidth) / 2;
+        this.renderString(centerStr, centerX, midTop, digitW, digitH, spacing);
+
+        const rightStr = "8";
+        const rightWidth = rightStr.length * digitW + (rightStr.length - 1) * spacing;
+        const rightX = viewW - padding - rightWidth;
+        this.renderString(rightStr, rightX, sideTop, digitW, digitH, spacing);
+    }
+}
 
 class StarField {
     constructor() {
@@ -493,6 +479,7 @@ class AnimationController {
     constructor() {
         this.starField = new StarField();
         this.starField.create(200);
+		this.display = new VectorDigits();
         
         this.activeShips = [];
         this.spawnQueue = [];
@@ -630,23 +617,12 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         keysDown.add('Space');
         controller.net.show();
-
-		window.saveThisText = new paper.PointText(paper.view.center);
-		window.saveThisText.content = 'Hello World';
-		window.saveThisText.style = {
-			fontFamily: 'Courier New',
-			fontWeight: 'bold',
-			fontSize: 20,
-			fillColor: 'red'
-		};
     }
 });
 window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') {
         keysDown.delete('Space');
         controller.net.hide();
-
-		window.saveThisText.remove();
     }
 });
 window.addEventListener('blur', () => {
