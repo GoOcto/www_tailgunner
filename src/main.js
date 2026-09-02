@@ -143,11 +143,12 @@ class StarField {
 }
 
 class VectorStarfighter {
-    constructor(modelData, scale = 20) {
+    constructor(modelData, scale, waveSpeed = null) {
         this.vertices = modelData.vertices.map(v => ({ x: v.x, y: v.y, z: v.z }));
         this.edges = modelData.edges;
         this.scale = scale;
         this.lines = [];
+        this.time = 5 * Math.random();
 
         this.edges.forEach(() => {
             this.lines.push(new paper.Path.Line({
@@ -156,13 +157,15 @@ class VectorStarfighter {
             }));
         });
 
-        this.spiralSpeed = (Math.random() + 0.25) * 2.0; 
-        this.zSpeed = Math.random() * 20 + 30; 
+        this.spiralSpeed = Math.random() * 0.5 + 0.6; 
+        if (Math.random() < .5) this.spiralSpeed *= -1;
+        
+        this.zSpeed = waveSpeed !== null ? waveSpeed : (Math.random() * 10 + 10); 
         this.z = 4000;
 
         this.pinchZ = 1000 + (Math.random() - 0.5) * 500; 
         this.minRadius = Math.random() * 150 + 50;        
-        this.spread = Math.random() * 200 + 150;          
+        this.spread = 800 + 800 * Math.random();
         this.centerX = (Math.random() - 0.5) * 500;
         this.centerY = (Math.random() - 0.5) * 500;
     }
@@ -171,7 +174,9 @@ class VectorStarfighter {
         this.lines.forEach(line => line.remove());
     }
 
-    update(time) {
+    update(deltaTime) {
+		this.time += deltaTime;
+
         const cx = paper.view.size.width / 2;
         const cy = paper.view.size.height / 2;
         const fov = 300;
@@ -183,20 +188,24 @@ class VectorStarfighter {
             return (zDiff * zDiff) * this.spread + this.minRadius;
         };
 
+		const exponentialDecay = 0.5**(this.z / 4000); 
+		const zDepSpiralSpeed = this.spiralSpeed * exponentialDecay;
+
         const currentRadius = getRadiusAtZ(this.z);
-        this.x = this.centerX + Math.cos(time * this.spiralSpeed) * currentRadius;
-        this.y = this.centerY + Math.sin(time * this.spiralSpeed) * currentRadius;
+        this.x = this.centerX + Math.cos(this.time * zDepSpiralSpeed) * currentRadius;
+        this.y = this.centerY + Math.sin(this.time * zDepSpiralSpeed) * currentRadius;
 
         const nextZ = this.z - this.zSpeed;
-        const nextTime = time + (1.0 / 60.0); 
+        const nextTime = this.time + (1.0 / 60.0); 
         const nextRadius = getRadiusAtZ(nextZ);
         
-        const nextX = this.centerX + Math.cos(nextTime * this.spiralSpeed) * nextRadius;
-        const nextY = this.centerY + Math.sin(nextTime * this.spiralSpeed) * nextRadius;
+        const nextX = this.centerX + Math.cos(nextTime * zDepSpiralSpeed) * nextRadius;
+        const nextY = this.centerY + Math.sin(nextTime * zDepSpiralSpeed) * nextRadius;
         
         const dx = nextX - this.x;
         const dy = nextY - this.y;
-        const dz = nextZ - this.z; 
+		const forwardBias = 30.0;
+        const dz = nextZ - this.z - forwardBias;
 
         const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const fx = dx / length;
@@ -263,23 +272,54 @@ class AnimationController {
     constructor() {
         this.starField = new StarField();
         this.starField.create(200);
-        this.spawnHero();
+        
+        this.activeShips = [];
+        this.spawnQueue = [];
+        this.waveTimer = 0;
+        
+        this.startWave();
     }
     
-    spawnHero() {
-        if (this.heroShip) {
-            this.heroShip.destroy();
-        }
-        const randomVehicle = Vehicles[Math.floor(Math.random() * Vehicles.length)];
-        this.heroShip = new VectorStarfighter(randomVehicle, 25);
+    startWave() {
+        const sharedSpeed = Math.random() * 10 + 10;
+        const sharedModel = Vehicles[Math.floor(Math.random() * Vehicles.length)];
+
+		const t0 =      0.04 + 0.08*Math.random();
+		const t1 = t0 + 0.04 + 0.08*Math.random();
+		const t2 = t1 + 0.04 + 0.08*Math.random();
+
+        this.spawnQueue = [
+            { delay: t0, speed: sharedSpeed, model: sharedModel },
+            { delay: t1, speed: sharedSpeed, model: sharedModel },
+            { delay: t2, speed: sharedSpeed, model: sharedModel },
+        ];
+        this.waveTimer = 0;
     }
 
     onFrame(event) {
         this.starField.update();
-        this.heroShip.update(event.time);
+        this.waveTimer += event.delta;
         
-        if (this.heroShip.z < -400) {
-            this.spawnHero();
+        for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
+            if (this.waveTimer >= this.spawnQueue[i].delay) {
+                const q = this.spawnQueue.splice(i, 1)[0];
+                //const randomVehicle = Vehicles[Math.floor(Math.random() * Vehicles.length)];
+                this.activeShips.push(new VectorStarfighter(q.model, 25, q.speed));
+            }
+        }
+
+        for (let i = this.activeShips.length - 1; i >= 0; i--) {
+            let ship = this.activeShips[i];
+            ship.update(event.delta);
+            
+            if (ship.z < -400) {
+                ship.destroy();
+                this.activeShips.splice(i, 1);
+            }
+        }
+        
+        if (this.activeShips.length === 0 && this.spawnQueue.length === 0) {
+            this.startWave();
         }
     }
     
