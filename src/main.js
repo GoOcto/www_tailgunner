@@ -136,6 +136,8 @@ class VectorStarfighter {
         this.edges = modelData.edges;
         this.scale = scale;
         this.lines = [];
+        this.visibleEdges = [];
+        this.projectedBounds = null;
         this.time = 5 * Math.random();
 
         this.edges.forEach(() => {
@@ -160,6 +162,23 @@ class VectorStarfighter {
 
     destroy() {
         this.lines.forEach(line => line.remove());
+    }
+
+    containsReticle(point, padding = 24) {
+        if (!this.projectedBounds) return false;
+
+        return point.x >= this.projectedBounds.minX - padding
+            && point.x <= this.projectedBounds.maxX + padding
+            && point.y >= this.projectedBounds.minY - padding
+            && point.y <= this.projectedBounds.maxY + padding;
+    }
+
+    getExplosionEdges() {
+        return this.visibleEdges.map(edge => ({
+            p1: edge.p1.clone(),
+            p2: edge.p2.clone(),
+            opacity: edge.opacity
+        }));
     }
 
     update(deltaTime) {
@@ -213,6 +232,25 @@ class VectorStarfighter {
         const yx = zy * xz - zz * xy;
         const yy = zz * xx - zx * xz;
         const yz = zx * xy - zy * xx;
+        this.visibleEdges = [];
+        this.projectedBounds = null;
+
+        const addProjectedPoint = (point) => {
+            if (!this.projectedBounds) {
+                this.projectedBounds = {
+                    minX: point.x,
+                    minY: point.y,
+                    maxX: point.x,
+                    maxY: point.y
+                };
+                return;
+            }
+
+            this.projectedBounds.minX = Math.min(this.projectedBounds.minX, point.x);
+            this.projectedBounds.minY = Math.min(this.projectedBounds.minY, point.y);
+            this.projectedBounds.maxX = Math.max(this.projectedBounds.maxX, point.x);
+            this.projectedBounds.maxY = Math.max(this.projectedBounds.maxY, point.y);
+        };
 
         this.edges.forEach((edge, index) => {
             const v1 = this.vertices[edge[0]];
@@ -248,11 +286,62 @@ class VectorStarfighter {
                 this.lines[index].visible = true;
                 this.lines[index].segments[0].point = p1;
                 this.lines[index].segments[1].point = p2;
-                this.lines[index].opacity = Math.max(0.1, 1 - (this.z / 5000));
+                const opacity = Math.max(0.1, 1 - (this.z / 5000));
+                this.lines[index].opacity = opacity;
+                this.visibleEdges.push({ p1, p2, opacity });
+                addProjectedPoint(p1);
+                addProjectedPoint(p2);
             } else {
                 this.lines[index].visible = false;
             }
         });
+    }
+}
+
+class ExplosionEdge {
+    constructor(edge) {
+        this.center = edge.p1.add(edge.p2).divide(2);
+        this.localP1 = edge.p1.subtract(this.center);
+        this.localP2 = edge.p2.subtract(this.center);
+        this.velocity = new paper.Point({
+			length: 5 + Math.random()*10,
+            angle: Math.random() * 360
+        });
+        this.angle = 0;
+        this.angularVelocity = 20 * Math.random();
+        this.age = 0;
+        this.duration = 0.65;
+        this.initialOpacity = edge.opacity;
+        this.path = new paper.Path.Line({
+            from: edge.p1,
+            to: edge.p2,
+            strokeColor: beamColor,
+            strokeWidth: 0.8,
+            opacity: edge.opacity
+        });
+    }
+
+    update(deltaTime) {
+        this.age += deltaTime;
+        this.center = this.center.add(this.velocity.multiply(deltaTime));
+        this.angle += this.angularVelocity * deltaTime;
+
+        const p1 = this.center.add(this.localP1.rotate(this.angle));
+        const p2 = this.center.add(this.localP2.rotate(this.angle));
+        this.path.segments[0].point = p1;
+        this.path.segments[1].point = p2;
+        this.path.opacity = this.initialOpacity * Math.max(0, 1 - (this.age / this.duration));
+
+        if (this.age >= this.duration) {
+            this.destroy();
+            return true;
+        }
+
+        return false;
+    }
+
+    destroy() {
+        this.path.remove();
     }
 }
 
@@ -369,6 +458,7 @@ class DeltaShot {
         const cy = paper.view.size.height / 2;
         this.fov = 300;
         const depth = 2000;
+        this.targetScreenPoint = targetScreenPoint.clone();
 
         this.start3D = {
             x: startScreenPoint.x - cx,
@@ -488,6 +578,7 @@ class AnimationController {
         this.reticle = new Reticle();        
 
         this.activeShots = [];
+        this.explosionEdges = [];
         this.reloadTimeSecs = 0.25;
         this.reloadTimer = 0;
 
@@ -545,6 +636,26 @@ class AnimationController {
         this.waveTimer = 0;
     }
 
+    explodeShip(ship) {
+        ship.getExplosionEdges().forEach(edge => {
+            this.explosionEdges.push(new ExplosionEdge(edge));
+        });
+        ship.destroy();
+    }
+
+    hitShipAt(point) {
+        for (let i = this.activeShips.length - 1; i >= 0; i--) {
+            const ship = this.activeShips[i];
+            if (ship.containsReticle(point)) {
+                this.explodeShip(ship);
+                this.activeShips.splice(i, 1);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     onFrame(event) {
         this.starField.update();
         this.waveTimer += event.delta;
@@ -578,8 +689,16 @@ class AnimationController {
             const shot = this.activeShots[i];
             const reachedTarget = shot.update(event.delta);
             if (reachedTarget) {
+                this.hitShipAt(shot.targetScreenPoint);
                 shot.destroy();
                 this.activeShots.splice(i, 1);
+            }
+        }
+
+        for (let i = this.explosionEdges.length - 1; i >= 0; i--) {
+            const edgeFinished = this.explosionEdges[i].update(event.delta);
+            if (edgeFinished) {
+                this.explosionEdges.splice(i, 1);
             }
         }
     }
