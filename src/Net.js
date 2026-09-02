@@ -1,0 +1,19 @@
+import paper from 'paper';
+import { beamColor } from './constants.js';
+export class Net {
+    constructor() {
+        this.group = new paper.Group();
+        this.group.visible = false;
+    }
+    rebuild(){this.group.removeChildren();const w=paper.view.size.width,h=paper.view.size.height,cell=w/3,shift=(h-2*cell)/2;
+        for(let row=0;row<2;row++)for(let col=0;col<3;col++){const p=new paper.Path({strokeColor:beamColor,strokeWidth:1.5,strokeCap:'round',strokeJoin:'round',opacity:.65});
+            p.add(new paper.Point(col*cell,shift+row*cell+.5*cell));p.add(new paper.Point(col*cell+.5*cell,shift+row*cell));p.add(new paper.Point(col*cell+cell,shift+row*cell+.5*cell));p.add(new paper.Point(col*cell+.5*cell,shift+row*cell+cell));p.add(new paper.Point(col*cell,shift+row*cell+.5*cell));this.group.addChild(p);}}
+    show() {
+        this.rebuild();
+        this.group.visible = true;
+        this.group.bringToFront();
+    }
+    hide() {
+        this.group.visible = false;
+    }
+}
