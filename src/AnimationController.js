@@ -1,13 +1,19 @@
 import paper from "paper";
 import { Vehicles } from "./assets.js";
-import { gameState } from "./constants.js";
+import { gameState, saveHighScore } from "./constants.js";
 import { DeltaShot } from "./DeltaShot.js";
 import { ExplosionEdge } from "./ExplosionEdge.js";
 import { Net } from "./Net.js";
 import { Reticle } from "./Reticle.js";
 import { StarField } from "./StarField.js";
+import { StartButton } from "./StartButton.js";
 import { VectorDigits } from "./VectorDigits.js";
 import { VectorStarfighter } from "./VectorStarfighter.js";
+
+const SHIPS_PER_ROUND = 10;
+const DEMO_SHOT_MIN_INTERVAL = 0.6;
+const DEMO_SHOT_MAX_INTERVAL = 2.2;
+const POST_GAME_CLICK_LOCKOUT_SECS = 10;
 
 export class AnimationController {
 	constructor(canvas) {
@@ -27,16 +33,90 @@ export class AnimationController {
 		this.explosionEdges = [];
 		this.reloadTimeSecs = 0.25;
 		this.reloadTimer = 0;
+		this.startButton = new StartButton();
+		this.demoShotTimer = this.nextDemoShotDelay();
+		this.clickLockoutTimer = 0;
+		this.enterDemoMode();
 		this.startWave();
 		window.addEventListener("mousemove", (e) => {
+			if (this.mode !== "game" && !this.startButton.group.visible) return;
 			const r = canvas.getBoundingClientRect(),
 				x = paper.view.size.width / r.width,
-				y = paper.view.size.height / r.height;
-			this.reticle.moveTo(new paper.Point((e.clientX - r.left) * x, (e.clientY - r.top) * y));
+				y = paper.view.size.height / r.height,
+				point = new paper.Point((e.clientX - r.left) * x, (e.clientY - r.top) * y);
+			this.reticle.moveTo(point);
+			if (this.startButton.group.visible) this.startButton.setHover(point);
 		});
-		canvas.addEventListener("mouseleave", () => (this.reticle.group.visible = false));
-		canvas.addEventListener("mouseenter", () => (this.reticle.group.visible = true));
-		canvas.addEventListener("mousedown", () => this.fireWeapon());
+		canvas.addEventListener("mouseleave", () => {
+			if (this.mode === "game" || this.startButton.group.visible) this.reticle.group.visible = false;
+		});
+		canvas.addEventListener("mouseenter", () => {
+			if (this.mode === "game" || this.startButton.group.visible) this.reticle.group.visible = true;
+		});
+		canvas.addEventListener("mousedown", (e) => this.onMouseDown(e));
+		canvas.addEventListener("mouseup", (e) => this.onMouseUp(e));
+		canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+	}
+	nextDemoShotDelay() {
+		return DEMO_SHOT_MIN_INTERVAL + Math.random() * (DEMO_SHOT_MAX_INTERVAL - DEMO_SHOT_MIN_INTERVAL);
+	}
+	onMouseDown(e) {
+		if (this.mode === "game") {
+			if (e.button === 2) this.net.show();
+			else this.fireWeapon();
+			return;
+		}
+		if (this.clickLockoutTimer > 0) return;
+		const r = this.canvas.getBoundingClientRect(),
+			x = paper.view.size.width / r.width,
+			y = paper.view.size.height / r.height,
+			point = new paper.Point((e.clientX - r.left) * x, (e.clientY - r.top) * y);
+		if (this.startButton.containsPoint(point)) this.startGame();
+		else if (!this.startButton.group.visible) {
+			this.startButton.show();
+			this.reticle.moveTo(point);
+			this.reticle.group.visible = true;
+		}
+	}
+	onMouseUp(e) {
+		if (this.mode === "game" && e.button === 2) this.net.hide();
+	}
+	enterDemoMode() {
+		this.mode = "demo";
+		this.reticle.group.visible = false;
+		this.startButton.hide();
+		this.display.rebuildDemo();
+	}
+	startGame() {
+		gameState.score = 0;
+		gameState.ships = 0;
+		gameState.energy = 80;
+		this.mode = "game";
+		this.startButton.hide();
+		this.reticle.moveTo(paper.view.center);
+		this.reticle.group.visible = true;
+		this.clearActiveEntities();
+		this.display.rebuild();
+		this.startWave();
+	}
+	clearActiveEntities() {
+		this.activeShips.forEach((ship) => ship.destroy());
+		this.activeShips = [];
+		this.spawnQueue = [];
+		this.activeShots.forEach((shot) => shot.destroy());
+		this.activeShots = [];
+		this.explosionEdges.forEach((edge) => edge.destroy());
+		this.explosionEdges = [];
+		this.hyperJumpTimer = 0;
+		this.starField.speed = this.baseStarfieldSpeed;
+		this.net.hide();
+	}
+	endGameRound() {
+		gameState.lastScore = gameState.score;
+		gameState.highScore = Math.max(gameState.highScore, gameState.score);
+		saveHighScore();
+		this.enterDemoMode();
+		this.clickLockoutTimer = POST_GAME_CLICK_LOCKOUT_SECS;
 	}
 	fireWeapon() {
 		if (this.reloadTimer > 0) return;
@@ -45,6 +125,16 @@ export class AnimationController {
 			t = this.reticle.pos;
 		this.activeShots.push(new DeltaShot(new paper.Point(0, h), t), new DeltaShot(new paper.Point(w, h), t));
 		this.reloadTimer = this.reloadTimeSecs;
+	}
+	fireDemoShot() {
+		if (this.activeShips.length === 0) return;
+		const ship = this.activeShips[Math.floor(Math.random() * this.activeShips.length)];
+		if (!ship.projectedBounds) return;
+		const b = ship.projectedBounds,
+			target = new paper.Point((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2),
+			w = paper.view.size.width,
+			h = paper.view.size.height;
+		this.activeShots.push(new DeltaShot(new paper.Point(0, h), target), new DeltaShot(new paper.Point(w, h), target));
 	}
 	startWave() {
 		const speed = Math.random() * 10 + 10,
@@ -62,13 +152,15 @@ export class AnimationController {
 		ship.getExplosionEdges().forEach((e) => this.explosionEdges.push(new ExplosionEdge(e)));
 		ship.destroy();
 	}
-	hitShipAt(point) {
+	hitShipAt(point, scores = true) {
 		for (let i = this.activeShips.length - 1; i >= 0; i--) {
 			const ship = this.activeShips[i];
 			if (ship.containsReticle(point)) {
-				const z = Math.min(Math.max(ship.z, 40), 4000);
-				gameState.score += Math.round(18.23 * Math.exp(0.000253 * z) - 13.42);
-				this.display.rebuild();
+				if (scores) {
+					const z = Math.min(Math.max(ship.z, 40), 4000);
+					gameState.score += Math.round(18.23 * Math.exp(0.000253 * z) - 13.42);
+					this.display.rebuild();
+				}
 				this.explodeShip(ship);
 				this.activeShips.splice(i, 1);
 				return true;
@@ -77,17 +169,33 @@ export class AnimationController {
 		return false;
 	}
 	onFrame(event) {
+		if (this.mode === "demo") {
+			if (this.clickLockoutTimer > 0) this.clickLockoutTimer = Math.max(0, this.clickLockoutTimer - event.delta);
+			if (this.startButton.update(event.delta)) {
+				// button just timed out and hid itself; demo shooting resumes
+				this.demoShotTimer = this.nextDemoShotDelay();
+				this.reticle.group.visible = false;
+			}
+			if (!this.startButton.group.visible) {
+				this.demoShotTimer -= event.delta;
+				if (this.demoShotTimer <= 0) {
+					this.fireDemoShot();
+					this.demoShotTimer = this.nextDemoShotDelay();
+				}
+			}
+		}
 		if (this.hyperJumpTimer > 0) {
 			this.hyperJumpTimer = Math.max(0, this.hyperJumpTimer - event.delta);
 			if (this.hyperJumpTimer === 0) {
 				this.starField.speed = this.baseStarfieldSpeed;
-				this.startWave();
+				if (this.mode === "game" && gameState.ships >= SHIPS_PER_ROUND) this.endGameRound();
+				else this.startWave();
 			}
 		}
 		this.starField.update();
 		this.waveTimer += event.delta;
 		let displayFlag = false;
-		if (this.net.group.visible) {
+		if (this.mode === "game" && this.net.group.visible) {
 			gameState.energy -= 5 / 60;
 			displayFlag = true;
 		}
@@ -100,11 +208,13 @@ export class AnimationController {
 			const ship = this.activeShips[i];
 			ship.update(event.delta);
 			if (ship.justPassedCamera) {
-				if (this.net.group.visible) ship.startRebound();
+				if (this.mode === "game" && this.net.group.visible) ship.startRebound();
 				else if (!ship.counted) {
-					gameState.ships++;
 					ship.counted = true;
-					displayFlag = true;
+					if (this.mode === "game") {
+						gameState.ships++;
+						displayFlag = true;
+					}
 				}
 			}
 			if ((ship.rebound && ship.rebound.age >= ship.rebound.duration) || (!ship.rebound && ship.z < -400)) {
@@ -114,7 +224,9 @@ export class AnimationController {
 		}
 		if (displayFlag) this.display.rebuild();
 		if (this.hyperJumpTimer === 0 && this.activeShips.length === 0 && this.spawnQueue.length === 0) {
-			if (gameState.ships > this.waveStartShipsN) {
+			if (this.mode === "game" && gameState.ships >= SHIPS_PER_ROUND) {
+				this.endGameRound();
+			} else if (gameState.ships > this.waveStartShipsN && this.mode === "game") {
 				this.hyperJumpTimer = 2;
 				this.starField.speed = this.baseStarfieldSpeed * 5;
 			} else this.startWave();
@@ -123,7 +235,7 @@ export class AnimationController {
 		for (let i = this.activeShots.length - 1; i >= 0; i--) {
 			const s = this.activeShots[i];
 			if (s.update(event.delta)) {
-				this.hitShipAt(s.targetScreenPoint);
+				this.hitShipAt(s.targetScreenPoint, this.mode === "game");
 				s.destroy();
 				this.activeShots.splice(i, 1);
 			}
@@ -134,5 +246,6 @@ export class AnimationController {
 	onResize() {
 		if (this.net.group.visible) this.net.rebuild();
 		this.reticle.rebuild();
+		if (this.startButton.group.visible) this.startButton.rebuild();
 	}
 }
