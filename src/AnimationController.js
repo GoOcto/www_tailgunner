@@ -3,6 +3,7 @@ import { Vehicles } from "./assets.js";
 import { gameState, saveHighScore } from "./constants.js";
 import { DeltaShot } from "./DeltaShot.js";
 import { ExplosionEdge } from "./ExplosionEdge.js";
+import { GameOver } from "./GameOver.js";
 import { Net } from "./Net.js";
 import { Reticle } from "./Reticle.js";
 import { StarField } from "./StarField.js";
@@ -14,6 +15,9 @@ const SHIPS_PER_ROUND = 10;
 const DEMO_SHOT_MIN_INTERVAL = 0.6;
 const DEMO_SHOT_MAX_INTERVAL = 2.2;
 const POST_GAME_CLICK_LOCKOUT_SECS = 10;
+const GAME_OVER_SECS = 10;
+const GAME_OVER_STARFIELD_SPEED_MULTIPLIER = 0.1;
+const GAME_OVER_SKIP_CLICK_INTERVAL_SECS = 0.5;
 const DEMO_TARGET_MARGIN = 0.1; // demo shots never target outside the inner 80% of the screen
 const DEMO_AIM_MAX_SECS = 1.2;
 const DEMO_AIM_EASE_RATE = 8;
@@ -37,7 +41,12 @@ export class AnimationController {
 		this.explosionEdges = [];
 		this.reloadTimeSecs = 0.25;
 		this.reloadTimer = 0;
+		this.sustainedFireTimer = 0;
 		this.startButton = new StartButton();
+		this.gameOver = new GameOver();
+		this.gameOverTimer = 0;
+		this.gameOverClickCount = 0;
+		this.gameOverClickTimer = null;
 		this.demoShotTimer = this.nextDemoShotDelay();
 		this.demoAimTarget = null;
 		this.demoAimTimer = 0;
@@ -71,6 +80,17 @@ export class AnimationController {
 		return DEMO_SHOT_MIN_INTERVAL + Math.random() * (DEMO_SHOT_MAX_INTERVAL - DEMO_SHOT_MIN_INTERVAL);
 	}
 	onMouseDown(e) {
+		if (this.mode === "gameOver") {
+			if (e.button !== 0) return;
+			if (this.gameOverClickTimer === null || this.gameOverClickTimer >= GAME_OVER_SKIP_CLICK_INTERVAL_SECS) {
+				this.gameOverClickCount++;
+			} else {
+				this.gameOverClickCount = 1;
+			}
+			this.gameOverClickTimer = 0;
+			if (this.gameOverClickCount === 3) this.finishGameOver(true);
+			return;
+		}
 		if (this.mode === "game") {
 			if (e.button === 2) this.net.show();
 			else {
@@ -99,6 +119,7 @@ export class AnimationController {
 	}
 	enterDemoMode() {
 		this.mode = "demo";
+		gameState.mode = this.mode;
 		this.canvas.style.cursor = "default";
 		this.isFiring = false;
 		this.demoAimTarget = null;
@@ -106,6 +127,7 @@ export class AnimationController {
 		this.demoShotTimer = this.nextDemoShotDelay();
 		this.reticle.group.visible = true;
 		this.startButton.hide();
+		this.gameOver.hide();
 		this.display.rebuildDemo();
 	}
 	startGame() {
@@ -114,7 +136,9 @@ export class AnimationController {
 		gameState.energy = 80;
 		this.canvas.style.cursor = "";
 		this.mode = "game";
+		gameState.mode = this.mode;
 		this.startButton.hide();
+		this.gameOver.hide();
 		this.reticle.moveTo(paper.view.center);
 		this.reticle.group.visible = true;
 		this.clearActiveEntities();
@@ -137,8 +161,23 @@ export class AnimationController {
 		gameState.lastScore = gameState.score;
 		gameState.highScore = Math.max(gameState.highScore, gameState.score);
 		saveHighScore();
-		this.enterDemoMode();
+		this.mode = "gameOver";
+		gameState.mode = this.mode;
+		this.gameOverTimer = GAME_OVER_SECS;
+		this.gameOverClickCount = 0;
+		this.gameOverClickTimer = null;
+		this.canvas.style.cursor = "default";
+		this.isFiring = false;
+		this.net.hide();
+		this.reticle.group.visible = false;
+		this.starField.speed = this.baseStarfieldSpeed * GAME_OVER_STARFIELD_SPEED_MULTIPLIER;
+		this.gameOver.show();
 		this.clickLockoutTimer = POST_GAME_CLICK_LOCKOUT_SECS;
+	}
+	finishGameOver(skipLockout = false) {
+		if (skipLockout) this.clickLockoutTimer = 0;
+		this.enterDemoMode();
+		this.startWave();
 	}
 	fireWeapon() {
 		if (this.reloadTimer > 0) return;
@@ -147,6 +186,7 @@ export class AnimationController {
 			t = this.reticle.pos;
 		this.activeShots.push(new DeltaShot(new paper.Point(0, h), t), new DeltaShot(new paper.Point(w, h), t));
 		this.reloadTimer = this.reloadTimeSecs;
+		this.sustainedFireTimer = this.reloadTimeSecs * 2;
 	}
 	demoTargetableShipCenter(ship) {
 		if (!ship.projectedBounds) return null;
@@ -236,6 +276,15 @@ export class AnimationController {
 		return false;
 	}
 	onFrame(event) {
+		if (this.mode === "gameOver") {
+			this.gameOverTimer = Math.max(0, this.gameOverTimer - event.delta);
+			if (this.gameOverClickTimer !== null) this.gameOverClickTimer += event.delta;
+			this.starField.update();
+			if (this.gameOverTimer === 0) {
+				this.finishGameOver();
+			}
+			return;
+		}
 		if (this.mode === "demo") {
 			if (this.clickLockoutTimer > 0) this.clickLockoutTimer = Math.max(0, this.clickLockoutTimer - event.delta);
 			if (this.startButton.update(event.delta)) {
@@ -259,6 +308,10 @@ export class AnimationController {
 		let displayFlag = false;
 		if (this.mode === "game" && this.net.group.visible) {
 			gameState.energy -= 5 / 60;
+			if (gameState.energy <= 0) {
+				gameState.energy = 0;
+				this.net.hide();
+			}
 			displayFlag = true;
 		}
 		for (let i = this.spawnQueue.length - 1; i >= 0; i--)
@@ -287,14 +340,16 @@ export class AnimationController {
 		if (displayFlag) this.display.rebuild();
 		if (this.hyperJumpTimer === 0 && this.activeShips.length === 0 && this.spawnQueue.length === 0) {
 			if (this.mode === "game" && gameState.ships >= SHIPS_PER_ROUND) {
-				this.endGameRound();
+				this.hyperJumpTimer = 2;
+				this.starField.speed = this.baseStarfieldSpeed * 5;
 			} else if (gameState.ships > this.waveStartShipsN && this.mode === "game") {
 				this.hyperJumpTimer = 2;
 				this.starField.speed = this.baseStarfieldSpeed * 5;
 			} else this.startWave();
 		}
 		if (this.reloadTimer > 0) this.reloadTimer = Math.max(0, this.reloadTimer - event.delta);
-		if (this.isFiring && this.mode === "game" && this.reloadTimer === 0) this.fireWeapon();
+		if (this.sustainedFireTimer > 0) this.sustainedFireTimer = Math.max(0, this.sustainedFireTimer - event.delta);
+		if (this.isFiring && this.mode === "game" && this.reloadTimer === 0 && this.sustainedFireTimer === 0) this.fireWeapon();
 		for (let i = this.activeShots.length - 1; i >= 0; i--) {
 			const s = this.activeShots[i];
 			if (s.update(event.delta)) {
@@ -310,5 +365,6 @@ export class AnimationController {
 		if (this.net.group.visible) this.net.rebuild();
 		this.reticle.rebuild();
 		if (this.startButton.group.visible) this.startButton.rebuild();
+		if (this.gameOver.group.visible) this.gameOver.rebuild();
 	}
 }

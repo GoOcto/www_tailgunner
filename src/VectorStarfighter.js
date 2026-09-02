@@ -2,6 +2,10 @@ import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
 import { addVertexDots, setVertexDotsOpacity, setVertexDotsVisible, styleStroke, updateVertexDots } from "./VertexHighlight.js";
 
+const FORWARD_BIAS_START_Z = 4000;
+const FORWARD_BIAS_FULL_Z = 200;
+const MAX_FORWARD_BIAS = 120;
+
 export class VectorStarfighter {
 	constructor(modelData, scale, waveSpeed = null) {
 		this.vertices = modelData.vertices.map((v) => ({ x: v.x, y: v.y, z: v.z }));
@@ -67,15 +71,16 @@ export class VectorStarfighter {
 		const cx = paper.view.size.width / 2,
 			cy = paper.view.size.height / 2,
 			fov = 300,
-			previousZ = this.z;
+			previousZ = this.z,
+			frameScale = deltaTime * 60;
 		if (this.rebound) {
 			this.rebound.age += deltaTime;
 			["x", "y", "z"].forEach((axis) => {
 				this.rebound.rotation[axis] += this.rebound.spin[axis] * deltaTime;
 			});
-			this.z += this.rebound.speed * deltaTime * 60;
+			this.z += this.rebound.speed * frameScale;
 		} else {
-			this.z -= this.zSpeed;
+			this.z -= this.zSpeed * frameScale;
 			this.isPassingThreshold = previousZ > 125 && this.z <= 125;
 		}
 		const radius = (z) => ((z - this.pinchZ) / 1000) ** 2 * this.spread + this.minRadius;
@@ -83,21 +88,22 @@ export class VectorStarfighter {
 		if (this.rebound) {
 			nextX = this.x;
 			nextY = this.y;
-			nextZ = this.z + this.rebound.speed * deltaTime * 60;
+			nextZ = this.z + this.rebound.speed * frameScale;
 		} else {
 			const spiral = this.spiralSpeed * 0.5 ** (this.z / 4000),
 				r = radius(this.z);
 			this.x = this.centerX + Math.cos(this.time * spiral) * r;
 			this.y = this.centerY + Math.sin(this.time * spiral) * r;
-			nextZ = this.z - this.zSpeed;
+			nextZ = this.z - this.zSpeed * frameScale;
 			const nr = radius(nextZ),
-				nt = this.time + 1 / 60;
+				nt = this.time + deltaTime;
 			nextX = this.centerX + Math.cos(nt * spiral) * nr;
 			nextY = this.centerY + Math.sin(nt * spiral) * nr;
 		}
 		const dx = nextX - this.x,
 			dy = nextY - this.y,
-			dz = this.rebound ? nextZ - this.z : nextZ - this.z - 30;
+			forwardBias = Math.max(0, Math.min(1, (FORWARD_BIAS_START_Z - this.z) / (FORWARD_BIAS_START_Z - FORWARD_BIAS_FULL_Z))) ** 2 * MAX_FORWARD_BIAS * frameScale,
+			dz = this.rebound ? nextZ - this.z : nextZ - this.z - forwardBias;
 		const len = Math.sqrt(dx * dx + dy * dy + dz * dz),
 			fx = dx / len,
 			fy = dy / len,

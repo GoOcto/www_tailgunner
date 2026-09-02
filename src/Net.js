@@ -1,6 +1,6 @@
 import paper from "paper";
-import { beamColor, beamWidth } from "./constants.js";
-import { styleStroke, addVertexDots } from "./VertexHighlight.js";
+import { beamColor, beamWidth, gameState } from "./constants.js";
+import { addVertexDots, styleStroke } from "./VertexHighlight.js";
 export class Net {
 	constructor() {
 		this.group = new paper.Group();
@@ -32,9 +32,13 @@ export class Net {
 			}
 	}
 	show() {
-		this.rebuild();
-		this.group.visible = true;
-		this.group.bringToFront();
+		if (gameState.energy > 0 && gameState.mode !== "demo") {
+			this.rebuild();
+			this.group.visible = true;
+			this.group.bringToFront();
+		} else {
+			this.group.visible = false;
+		}
 	}
 	hide() {
 		this.group.visible = false;
