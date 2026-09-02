@@ -2,6 +2,9 @@ import paper from 'paper';
 import { DIGITS_DATA, Vehicles } from './assets.js';
 
 const beamColor = '#88dddd';
+let shipsN = 0;
+let scoreN = 0;
+let energy = 80;
 
 class VectorDigits {
     constructor() {
@@ -49,15 +52,15 @@ class VectorDigits {
 		const midTop = 6;
 		const sideTop = midTop + 2*spacing + digitH;
 
-        const leftStr = "173";
+        const leftStr = scoreN.toString();
         this.renderString(leftStr, padding, sideTop, digitW, digitH, spacing);
 
-        const centerStr = "46";
+        const centerStr = Math.floor(energy).toString();
         const centerWidth = centerStr.length * digitW + (centerStr.length - 1) * spacing;
         const centerX = (viewW - centerWidth) / 2;
         this.renderString(centerStr, centerX, midTop, digitW, digitH, spacing);
 
-        const rightStr = "8";
+        const rightStr = shipsN.toString();
         const rightWidth = rightStr.length * digitW + (rightStr.length - 1) * spacing;
         const rightX = viewW - padding - rightWidth;
         this.renderString(rightStr, rightX, sideTop, digitW, digitH, spacing);
@@ -158,6 +161,8 @@ class VectorStarfighter {
         this.spread = 800 + 800 * Math.random();
         this.centerX = (Math.random() - 0.5) * 500;
         this.centerY = (Math.random() - 0.5) * 500;
+        this.justPassedCamera = false;
+        this.rebound = null;
     }
 
     destroy() {
@@ -181,38 +186,78 @@ class VectorStarfighter {
         }));
     }
 
+    startRebound() {
+        if (this.rebound) return;
+
+        this.rebound = {
+            age: 0,
+            duration: 2.6,
+            speed: this.zSpeed,
+            rotation: {
+                x: (Math.random() - 0.5) * 0.6,
+                y: (Math.random() - 0.5) * 0.6,
+                z: (Math.random() - 0.5) * 0.6
+            },
+            spin: {
+                x: (Math.random() - 0.5) * 2.5,
+                y: (Math.random() - 0.5) * 2.5,
+                z: (Math.random() - 0.5) * 2.5
+            }
+        };
+    }
+
     update(deltaTime) {
 		this.time += deltaTime;
+        this.justPassedCamera = false;
 
         const cx = paper.view.size.width / 2;
         const cy = paper.view.size.height / 2;
         const fov = 300;
         
-        this.z -= this.zSpeed;
+        const previousZ = this.z;
+        if (this.rebound) {
+            this.rebound.age += deltaTime;
+            this.rebound.rotation.x += this.rebound.spin.x * deltaTime;
+            this.rebound.rotation.y += this.rebound.spin.y * deltaTime;
+            this.rebound.rotation.z += this.rebound.spin.z * deltaTime;
+            this.z += this.rebound.speed * deltaTime * 60;
+        } else {
+            this.z -= this.zSpeed;
+            this.justPassedCamera = previousZ > 0 && this.z <= 100;
+        }
 
         const getRadiusAtZ = (currentZ) => {
             const zDiff = (currentZ - this.pinchZ) / 1000;
             return (zDiff * zDiff) * this.spread + this.minRadius;
         };
 
-		const exponentialDecay = 0.5**(this.z / 4000); 
-		const zDepSpiralSpeed = this.spiralSpeed * exponentialDecay;
+        let nextX;
+        let nextY;
+        let nextZ;
+        if (this.rebound) {
+            nextX = this.x;
+            nextY = this.y;
+            nextZ = this.z + this.rebound.speed * deltaTime * 60;
+        } else {
+            const exponentialDecay = 0.5**(this.z / 4000);
+            const zDepSpiralSpeed = this.spiralSpeed * exponentialDecay;
+            const currentRadius = getRadiusAtZ(this.z);
+            this.x = this.centerX + Math.cos(this.time * zDepSpiralSpeed) * currentRadius;
+            this.y = this.centerY + Math.sin(this.time * zDepSpiralSpeed) * currentRadius;
 
-        const currentRadius = getRadiusAtZ(this.z);
-        this.x = this.centerX + Math.cos(this.time * zDepSpiralSpeed) * currentRadius;
-        this.y = this.centerY + Math.sin(this.time * zDepSpiralSpeed) * currentRadius;
+            nextZ = this.z - this.zSpeed;
+            const nextTime = this.time + (1.0 / 60.0);
+            const nextRadius = getRadiusAtZ(nextZ);
+            nextX = this.centerX + Math.cos(nextTime * zDepSpiralSpeed) * nextRadius;
+            nextY = this.centerY + Math.sin(nextTime * zDepSpiralSpeed) * nextRadius;
+        }
 
-        const nextZ = this.z - this.zSpeed;
-        const nextTime = this.time + (1.0 / 60.0); 
-        const nextRadius = getRadiusAtZ(nextZ);
-        
-        const nextX = this.centerX + Math.cos(nextTime * zDepSpiralSpeed) * nextRadius;
-        const nextY = this.centerY + Math.sin(nextTime * zDepSpiralSpeed) * nextRadius;
-        
         const dx = nextX - this.x;
         const dy = nextY - this.y;
 		const forwardBias = 30.0;
-        const dz = nextZ - this.z - forwardBias;
+        const dz = this.rebound
+            ? nextZ - this.z
+            : nextZ - this.z - forwardBias;
 
         const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
         const fx = dx / length;
@@ -256,11 +301,31 @@ class VectorStarfighter {
             const v1 = this.vertices[edge[0]];
             const v2 = this.vertices[edge[1]];
             
-            const rotate = (v) => ({
-                x: v.x * xx + v.y * yx + v.z * zx,
-                y: v.x * xy + v.y * yy + v.z * zy,
-                z: v.x * xz + v.y * yz + v.z * zz
-            });
+            const rotate = (v) => {
+                let rotated = v;
+                if (this.rebound) {
+                    const { x: rx, y: ry, z: rz } = this.rebound.rotation;
+                    const cosX = Math.cos(rx), sinX = Math.sin(rx);
+                    const cosY = Math.cos(ry), sinY = Math.sin(ry);
+                    const cosZ = Math.cos(rz), sinZ = Math.sin(rz);
+                    const x1 = rotated.x;
+                    const y1 = rotated.y * cosX - rotated.z * sinX;
+                    const z1 = rotated.y * sinX + rotated.z * cosX;
+                    const x2 = x1 * cosY + z1 * sinY;
+                    const y2 = y1;
+                    const z2 = -x1 * sinY + z1 * cosY;
+                    rotated = {
+                        x: x2 * cosZ - y2 * sinZ,
+                        y: x2 * sinZ + y2 * cosZ,
+                        z: z2
+                    };
+                }
+                return {
+                    x: rotated.x * xx + rotated.y * yx + rotated.z * zx,
+                    y: rotated.x * xy + rotated.y * yy + rotated.z * zy,
+                    z: rotated.x * xz + rotated.y * yz + rotated.z * zz
+                };
+            };
 
             const rv1 = rotate(v1);
             const rv2 = rotate(v2);
@@ -286,7 +351,9 @@ class VectorStarfighter {
                 this.lines[index].visible = true;
                 this.lines[index].segments[0].point = p1;
                 this.lines[index].segments[1].point = p2;
-                const opacity = Math.max(0.1, 1 - (this.z / 5000));
+                const opacity = this.rebound
+                    ? Math.max(0, 1 - (this.rebound.age / this.rebound.duration))
+                    : Math.max(0.1, 1 - (this.z / 5000));
                 this.lines[index].opacity = opacity;
                 this.visibleEdges.push({ p1, p2, opacity });
                 addProjectedPoint(p1);
@@ -647,6 +714,12 @@ class AnimationController {
         for (let i = this.activeShips.length - 1; i >= 0; i--) {
             const ship = this.activeShips[i];
             if (ship.containsReticle(point)) {
+				// minPts = 5  @ ship.z<=40
+				// maxPts = 50 @ ship.z>=4000
+				const clampedZ = Math.min(Math.max(ship.z, 40), 4000);
+				const points = Math.round(18.23 * Math.exp(0.000253 * clampedZ) - 13.42);
+				scoreN += points;
+				this.display.rebuild();
                 this.explodeShip(ship);
                 this.activeShips.splice(i, 1);
                 return true;
@@ -659,6 +732,12 @@ class AnimationController {
     onFrame(event) {
         this.starField.update();
         this.waveTimer += event.delta;
+		let displayFlag = false;
+
+		if (this.net.group.visible) {
+			energy -= (1/3);
+			displayFlag = true;
+		}
         
         for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
             if (this.waveTimer >= this.spawnQueue[i].delay) {
@@ -670,12 +749,25 @@ class AnimationController {
         for (let i = this.activeShips.length - 1; i >= 0; i--) {
             let ship = this.activeShips[i];
             ship.update(event.delta);
-            
-            if (ship.z < -400) {
+
+            if (ship.justPassedCamera) {
+				if (this.net.group.visible) {
+                	ship.startRebound();
+				}
+				else {
+					shipsN += 1;
+					displayFlag = true;
+				}
+            }
+
+            if ((ship.rebound && ship.rebound.age >= ship.rebound.duration)
+                || (!ship.rebound && ship.z < -400)) {
                 ship.destroy();
                 this.activeShips.splice(i, 1);
             }
         }
+
+		if ( displayFlag ) this.display.rebuild();
         
         if (this.activeShips.length === 0 && this.spawnQueue.length === 0) {
             this.startWave();
