@@ -1,5 +1,5 @@
 import paper from "paper";
-import { beamColor, gameState } from "./constants.js";
+import { beamColor, beamWidth, gameState } from "./constants.js";
 
 const DIGITS_DATA = {
 	0: [ [0, 0], [2, 0], [2, 4], [0, 4], [0, 0]	],
@@ -27,7 +27,7 @@ export class VectorDigits {
 			if (!points) continue;
 			const path = new paper.Path({
 				strokeColor: beamColor,
-				strokeWidth: 1,
+				strokeWidth: beamWidth,
 				strokeCap: "square",
 				strokeJoin: "miter",
 			});
@@ -55,7 +55,7 @@ export class VectorDigits {
 		const center = String(Math.floor(gameState.energy));
 		const centerWidth = center.length * digitW + (center.length - 1) * spacing;
 		this.renderString(center, (viewW - centerWidth) / 2, midTop, digitW, digitH, spacing);
-		
+
 		const right = String(gameState.ships);
 		const rightWidth = right.length * digitW + (right.length - 1) * spacing;
 		this.renderString(right, viewW - padding - rightWidth, sideTop, digitW, digitH, spacing);

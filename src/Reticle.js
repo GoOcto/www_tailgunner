@@ -1,5 +1,5 @@
 import paper from "paper";
-import { beamColor } from "./constants.js";
+import { beamColor, beamWidth } from "./constants.js";
 export class Reticle {
 	constructor() {
 		this.group = new paper.Group();
@@ -16,7 +16,7 @@ export class Reticle {
 				new paper.Path.Line(c.add([-30, 0]), c.add([30, 0])),
 			],
 			strokeColor: color,
-			strokeWidth: 1,
+			strokeWidth: beamWidth,
 		});
 		const ticks = [];
 		[
@@ -28,7 +28,7 @@ export class Reticle {
 				ticks.push(new paper.Path.Line(c.add([t.pos * d, -t.len / 2]), c.add([t.pos * d, t.len / 2])));
 			}),
 		);
-		this.group.addChildren([axes, new paper.CompoundPath({ children: ticks, strokeColor: color, strokeWidth: 1 })]);
+		this.group.addChildren([axes, new paper.CompoundPath({ children: ticks, strokeColor: color, strokeWidth: beamWidth })]);
 	}
 	moveTo(point) {
 		this.pos = point.clone();

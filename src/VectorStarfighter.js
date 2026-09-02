@@ -1,5 +1,5 @@
 import paper from "paper";
-import { beamColor } from "./constants.js";
+import { beamColor, beamWidth } from "./constants.js";
 
 export class VectorStarfighter {
 	constructor(modelData, scale, waveSpeed = null) {
@@ -10,7 +10,7 @@ export class VectorStarfighter {
 		this.visibleEdges = [];
 		this.projectedBounds = null;
 		this.time = 5 * Math.random();
-		this.edges.forEach(() => this.lines.push(new paper.Path.Line({ strokeColor: beamColor, strokeWidth: 0.8 })));
+		this.edges.forEach(() => this.lines.push(new paper.Path.Line({ strokeColor: beamColor, strokeWidth: beamWidth })));
 		this.spiralSpeed = Math.random() * 0.5 + 0.6;
 		if (Math.random() < 0.5) this.spiralSpeed *= -1;
 		this.zSpeed = waveSpeed !== null ? waveSpeed : Math.random() * 10 + 10;

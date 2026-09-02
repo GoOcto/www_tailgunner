@@ -1,5 +1,5 @@
 import paper from "paper";
-import { beamColor } from "./constants.js";
+import { beamColor, beamWidth } from "./constants.js";
 export class Net {
 	constructor() {
 		this.group = new paper.Group();
@@ -15,7 +15,7 @@ export class Net {
 			for (let col = 0; col < 3; col++) {
 				const p = new paper.Path({
 					strokeColor: beamColor,
-					strokeWidth: 1.5,
+					strokeWidth: beamWidth,
 					strokeCap: "round",
 					strokeJoin: "round",
 					opacity: 0.65,

@@ -1,5 +1,5 @@
 import paper from "paper";
-import { beamColor } from "./constants.js";
+import { beamColor, beamWidth } from "./constants.js";
 export class DeltaShot {
 	constructor(startScreenPoint, targetScreenPoint) {
 		const cx = paper.view.size.width / 2,
@@ -19,7 +19,7 @@ export class DeltaShot {
 			{ x: 0, y: 0, z: 1 },
 			{ x: 0.5, y: 0, z: -0.6 },
 		];
-		this.path = new paper.Path({ strokeColor: new paper.Color(beamColor), strokeWidth: 1.5, closed: true });
+		this.path = new paper.Path({ strokeColor: new paper.Color(beamColor), strokeWidth: beamWidth, closed: true });
 		this.rebuild();
 	}
 	rebuild() {
