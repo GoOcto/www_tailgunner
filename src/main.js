@@ -319,12 +319,13 @@ class Net {
 class Reticle {
     constructor() {
         this.group = new paper.Group();
+        this.pos = paper.view.center.clone();
         this.rebuild();
     }
 
     rebuild() {
         this.group.removeChildren();
-        const center = paper.view.center;
+        const center = this.pos;
         const color = new paper.Color(beamColor);
 
         const axes = new paper.CompoundPath({
@@ -363,6 +364,11 @@ class Reticle {
 
         this.group.addChildren([axes, allTicks]);
     }
+
+    moveTo(point) {
+        this.pos = point.clone();
+        this.group.position = point;
+    }
 }
 
 class AnimationController {
@@ -374,9 +380,20 @@ class AnimationController {
         this.spawnQueue = [];
         this.waveTimer = 0;
         this.net = new Net();
-		this.reticle = new Reticle();        
+        this.reticle = new Reticle();        
 
         this.startWave();
+
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = paper.view.size.width / rect.width;
+            const scaleY = paper.view.size.height / rect.height;
+            const mousePos = new paper.Point(
+                (e.clientX - rect.left) * scaleX,
+                (e.clientY - rect.top) * scaleY
+            );
+            this.reticle.moveTo(mousePos);
+        });
     }
     
     startWave() {
