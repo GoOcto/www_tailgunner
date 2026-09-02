@@ -399,14 +399,17 @@ class DeltaShot {
 
         // Delta (triangle) shape pointing along direction of travel.
         // Base points defined relative to pointing toward +x, then rotated.
-        const tip = new paper.Point(size, 0);
+        const tip = new paper.Point(4*size, 0);
+        const inner = new paper.Point(1*size, 0);
         const backLeft = new paper.Point(-size * 0.6, size * 0.5);
         const backRight = new paper.Point(-size * 0.6, -size * 0.5);
 
         this.path.removeSegments();
         this.path.add(pos.add(tip.rotate(this.angle, [0, 0])));
         this.path.add(pos.add(backLeft.rotate(this.angle, [0, 0])));
+        this.path.add(pos.add(inner.rotate(this.angle, [0, 0])));
         this.path.add(pos.add(backRight.rotate(this.angle, [0, 0])));
+        this.path.add(pos.add(tip.rotate(this.angle, [0, 0])));
         this.path.closed = true;
     }
 
