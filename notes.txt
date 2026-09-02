@@ -8,18 +8,3 @@ open index.html
 
 
 
-Make a formation of three identical fighters.
-
-When we initialize them:
-- create a formation of three vehicles somewhat in the middle of the screen +/-33% and calculate their positions fp1, fp2 and fp3
-- a formation involves all three vehicles in close proximity such that every one pairs with at least one other and that paired one is within ~2 vehicle diameters
-- project backwards in time using the motion parameters to find the start points sp1, sp2 and sp3
-- project forwards in time using the motion parameters to find the end points ep1, ep2 and ep3
-
-- use the current parameters 
-- make sure that none of ep1, ep2, ep3 are within 2 vehicle diameters of the camera when they pass
-- if they are then calculate deltas so that each endpoint is not within proximity. prefer a camera location in the middle of them all if possible.
-- apply these deltas to sp1, sp2 and sp3, set the vehicles at those start points
-- each vehicle should have its own parameters, but they will meet at the formation points fp1, fp2 and fp3
-
-

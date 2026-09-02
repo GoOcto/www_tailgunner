@@ -125,7 +125,7 @@ class StarField {
                 star = this.stars[i];
             }
 
-            const scale =  this.fov / (this.fov + star.z);
+            const scale = this.fov / (this.fov + star.z);
             const sx = cx + (star.x * scale);
             const sy = cy + (star.y * scale);
             const projectedRadius = Math.max(0.1, star.baseRadius * scale);
@@ -148,7 +148,8 @@ class VectorStarfighter {
         this.edges = modelData.edges;
         this.scale = scale;
         this.lines = [];
-        this.time = 5 * Math.random();
+        this.time = 0;
+		this.spiralStart = Math.random() * Math.PI * 2;
 
         this.edges.forEach(() => {
             this.lines.push(new paper.Path.Line({
@@ -192,15 +193,15 @@ class VectorStarfighter {
 		const zDepSpiralSpeed = this.spiralSpeed * exponentialDecay;
 
         const currentRadius = getRadiusAtZ(this.z);
-        this.x = this.centerX + Math.cos(this.time * zDepSpiralSpeed) * currentRadius;
-        this.y = this.centerY + Math.sin(this.time * zDepSpiralSpeed) * currentRadius;
+        this.x = this.centerX + Math.cos(this.spiralStart + this.time * zDepSpiralSpeed) * currentRadius;
+        this.y = this.centerY + Math.sin(this.spiralStart + this.time * zDepSpiralSpeed) * currentRadius;
 
         const nextZ = this.z - this.zSpeed;
         const nextTime = this.time + (1.0 / 60.0); 
         const nextRadius = getRadiusAtZ(nextZ);
         
-        const nextX = this.centerX + Math.cos(nextTime * zDepSpiralSpeed) * nextRadius;
-        const nextY = this.centerY + Math.sin(nextTime * zDepSpiralSpeed) * nextRadius;
+        const nextX = this.centerX + Math.cos(this.spiralStart + nextTime * zDepSpiralSpeed) * nextRadius;
+        const nextY = this.centerY + Math.sin(this.spiralStart + nextTime * zDepSpiralSpeed) * nextRadius;
         
         const dx = nextX - this.x;
         const dy = nextY - this.y;
@@ -272,6 +273,8 @@ class Net {
     constructor() {
         this.group = new paper.Group();
         this.group.visible = false;
+        this.cellW = 90;
+        this.cellH = 70;
     }
 
     rebuild() {
@@ -279,27 +282,36 @@ class Net {
         const viewW = paper.view.size.width;
         const viewH = paper.view.size.height;
 
-        const totalRows = 2;
-        const totalCols = 3;
-		const cellW = viewW / totalCols;
-		const cellH = viewH / totalRows;
+        const totalRows = Math.ceil(viewH / this.cellH) + 4;
+        const totalCols = Math.ceil(viewW / this.cellW) + 4;
 
-        for (let row = 0; row < totalRows; row++) {
-            for (let col = 0; col < totalCols; col++) {
-				const path = new paper.Path({
-					strokeColor: '#dddddd',
-					strokeWidth: 1.5,
-					strokeCap: 'round',
-					strokeJoin: 'round',
-					opacity: 0.65
-				});
-				path.add(new paper.Point(col*cellW + 0.0*cellW, row*cellH + 0.5*cellH));
-				path.add(new paper.Point(col*cellW + 0.5*cellW, row*cellH + 0.0*cellH));
-				path.add(new paper.Point(col*cellW + 1.0*cellW, row*cellH + 0.5*cellH));
-				path.add(new paper.Point(col*cellW + 0.5*cellW, row*cellH + 1.0*cellH));
-				path.add(new paper.Point(col*cellW + 0.0*cellW, row*cellH + 0.5*cellH));
-	            this.group.addChild(path);
+        for (let row = -2; row < totalRows; row++) {
+            const isUpRow = row % 2 === 0;
+            const baseY = Math.floor(row / 2) * this.cellH * 2;
+            const startY = isUpRow ? baseY + this.cellH : baseY;
+
+            const path = new paper.Path({
+                strokeColor: '#00ff88',
+                strokeWidth: 1.5,
+                strokeCap: 'round',
+                strokeJoin: 'round',
+                opacity: 0.65
+            });
+
+            path.add(new paper.Point(-this.cellW, startY));
+
+            for (let col = -1; col < totalCols; col++) {
+                const x = col * this.cellW;
+                if (isUpRow) {
+                    path.add(new paper.Point(x + this.cellW / 2, baseY));
+                    path.add(new paper.Point(x + this.cellW, baseY + this.cellH));
+                } else {
+                    path.add(new paper.Point(x + this.cellW / 2, baseY + this.cellH));
+                    path.add(new paper.Point(x + this.cellW, baseY));
+                }
             }
+
+            this.group.addChild(path);
         }
     }
 
@@ -331,12 +343,15 @@ class AnimationController {
         const sharedSpeed = Math.random() * 10 + 10;
         const sharedModel = Vehicles[Math.floor(Math.random() * Vehicles.length)];
 
-		let t = 0;
-		this.spawnQueue = [];
-		for (let i=0;i<3;i++) {
-			t += 0.03 + 0.1*Math.random();
-			this.spawnQueue.push({ delay: t, speed: sharedSpeed, model: sharedModel });
-		}
+		const t0 =      0.04 + 0.08*Math.random();
+		const t1 = t0 + 0.04 + 0.08*Math.random();
+		const t2 = t1 + 0.04 + 0.08*Math.random();
+
+        this.spawnQueue = [
+            { delay: t0, speed: sharedSpeed, model: sharedModel },
+            { delay: t1, speed: sharedSpeed, model: sharedModel },
+            { delay: t2, speed: sharedSpeed, model: sharedModel },
+        ];
         this.waveTimer = 0;
     }
 
@@ -347,6 +362,7 @@ class AnimationController {
         for (let i = this.spawnQueue.length - 1; i >= 0; i--) {
             if (this.waveTimer >= this.spawnQueue[i].delay) {
                 const q = this.spawnQueue.splice(i, 1)[0];
+                //const randomVehicle = Vehicles[Math.floor(Math.random() * Vehicles.length)];
                 this.activeShips.push(new VectorStarfighter(q.model, 25, q.speed));
             }
         }
@@ -371,19 +387,7 @@ class AnimationController {
     }
 }
 
-const FIXED_W = 960; // 4:3 at 720p tall
-const FIXED_H = 720;
-const canvas = document.getElementById('gameCanvas');
-canvas.width = FIXED_W;
-canvas.height = FIXED_H;
-paper.setup(canvas);
-
-paper.view.viewSize = new paper.Size(FIXED_W, FIXED_H);
-
-paper.view.onResize = () => {
-    paper.view.viewSize = new paper.Size(FIXED_W, FIXED_H);
-};
-
+paper.setup(document.getElementById('gameCanvas'));
 const controller = new AnimationController();
 
 const keysDown = new Set();
