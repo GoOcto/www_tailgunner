@@ -162,6 +162,7 @@ class VectorStarfighter {
         this.centerX = (Math.random() - 0.5) * 500;
         this.centerY = (Math.random() - 0.5) * 500;
         this.justPassedCamera = false;
+		this.counted = false;
         this.rebound = null;
     }
 
@@ -735,7 +736,7 @@ class AnimationController {
 		let displayFlag = false;
 
 		if (this.net.group.visible) {
-			energy -= (1/3);
+			energy -= (5/60);
 			displayFlag = true;
 		}
         
@@ -754,8 +755,9 @@ class AnimationController {
 				if (this.net.group.visible) {
                 	ship.startRebound();
 				}
-				else {
+				else if (!ship.counted) {
 					shipsN += 1;
+					ship.counted = true;
 					displayFlag = true;
 				}
             }
