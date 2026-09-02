@@ -284,7 +284,7 @@ class Net {
         const totalRows = 2;
         const totalCols = 3;
 		const cellW = viewW / totalCols;
-		const cellH = viewH / totalRows;
+		const cellShift = (viewH - 2*cellW)/2;
 
         for (let row = 0; row < totalRows; row++) {
             for (let col = 0; col < totalCols; col++) {
@@ -295,11 +295,11 @@ class Net {
 					strokeJoin: 'round',
 					opacity: 0.65
 				});
-				path.add(new paper.Point(col*cellW + 0.0*cellW, row*cellH + 0.5*cellH));
-				path.add(new paper.Point(col*cellW + 0.5*cellW, row*cellH + 0.0*cellH));
-				path.add(new paper.Point(col*cellW + 1.0*cellW, row*cellH + 0.5*cellH));
-				path.add(new paper.Point(col*cellW + 0.5*cellW, row*cellH + 1.0*cellH));
-				path.add(new paper.Point(col*cellW + 0.0*cellW, row*cellH + 0.5*cellH));
+				path.add(new paper.Point(col*cellW + 0.0*cellW, cellShift + row*cellW + 0.5*cellW));
+				path.add(new paper.Point(col*cellW + 0.5*cellW, cellShift + row*cellW + 0.0*cellW));
+				path.add(new paper.Point(col*cellW + 1.0*cellW, cellShift + row*cellW + 0.5*cellW));
+				path.add(new paper.Point(col*cellW + 0.5*cellW, cellShift + row*cellW + 1.0*cellW));
+				path.add(new paper.Point(col*cellW + 0.0*cellW, cellShift + row*cellW + 0.5*cellW));
 	            this.group.addChild(path);
             }
         }
@@ -372,16 +372,46 @@ class Reticle {
 }
 
 class DeltaShot {
-    constructor(startPoint, targetPoint) {
-        this.start = startPoint.clone();
-        this.target = targetPoint.clone();
+    // startScreenPoint / targetScreenPoint are 2D screen-space points (paper.Point).
+    // Internally the shot travels through 3D space: it starts on the screen plane
+    // (z = 0, at the bottom corner) and flies to a point directly behind the
+    // reticle, `depth` units into the screen (z = depth), then is projected back
+    // to the screen every frame using the same perspective projection as the
+    // vector starfighters.
+    constructor(startScreenPoint, targetScreenPoint) {
+        const cx = paper.view.size.width / 2;
+        const cy = paper.view.size.height / 2;
+        this.fov = 300;
+        const depth = 2000;
+
+        this.start3D = {
+            x: startScreenPoint.x - cx,
+            y: startScreenPoint.y - cy,
+            z: 0
+        };
+
+        // Unproject the reticle's screen position out to `depth` so the target
+        // sits directly behind the reticle, `depth` units into the screen.
+        const targetProjScale = this.fov / (this.fov + depth);
+        this.target3D = {
+            x: (targetScreenPoint.x - cx) / targetProjScale,
+            y: (targetScreenPoint.y - cy) / targetProjScale,
+            z: depth
+        };
+
         this.progress = 0;
-        this.duration = 0.6; // seconds to travel from corner to reticle
+        this.duration = 0.25; // seconds for the full blaster animation
+        this.size = 40;
 
-        const dir = this.target.subtract(this.start);
-        this.angle = dir.angle; // paper.js: degrees, 0 = +x axis
-
-        this.baseSize = 22;
+        // Delta (arrow/triangle) shape defined top-down: x = left/right,
+        // z = forward (nose)/backward, y = 0 (flat). Local +z is the "nose"
+        // direction, which gets rotated to point along the travel direction.
+        this.localVertices = [
+            { x: 0, y: 0, z: 4.0 },    // tip / nose
+            { x: -0.5, y: 0, z: -0.6 }, // back-left
+            { x: 0, y: 0, z: 1.0 },    // inner tip
+            { x: 0.5, y: 0, z: -0.6 },  // back-right
+        ];
 
         this.path = new paper.Path({
             strokeColor: new paper.Color(beamColor),
@@ -393,23 +423,53 @@ class DeltaShot {
     }
 
     rebuild() {
-        const pos = this.start.add(this.target.subtract(this.start).multiply(this.progress));
-        const scale = Math.max(0.05, 1 - this.progress);
-        const size = this.baseSize * scale;
+        const cx = paper.view.size.width / 2;
+        const cy = paper.view.size.height / 2;
+        const fov = this.fov;
 
-        // Delta (triangle) shape pointing along direction of travel.
-        // Base points defined relative to pointing toward +x, then rotated.
-        const tip = new paper.Point(4*size, 0);
-        const inner = new paper.Point(1*size, 0);
-        const backLeft = new paper.Point(-size * 0.6, size * 0.5);
-        const backRight = new paper.Point(-size * 0.6, -size * 0.5);
+        const t = this.progress;
+        const posX = this.start3D.x + (this.target3D.x - this.start3D.x) * t;
+        const posY = this.start3D.y + (this.target3D.y - this.start3D.y) * t;
+        const posZ = this.start3D.z + (this.target3D.z - this.start3D.z) * t;
+
+        // Forward (travel) direction, used as the local +z axis for orienting
+        // the shape so its nose points along the direction of travel.
+        let fx = this.target3D.x - this.start3D.x;
+        let fy = this.target3D.y - this.start3D.y;
+        let fz = this.target3D.z - this.start3D.z;
+        const flen = Math.sqrt(fx * fx + fy * fy + fz * fz) || 1;
+        fx /= flen; fy /= flen; fz /= flen;
+
+        // Build an orthonormal basis (xAxis, yAxis, forward) via the standard
+        // up-vector cross product technique.
+        const upX = 0, upY = 1, upZ = 0;
+        let xx = upY * fz - upZ * fy;
+        let xy = upZ * fx - upX * fz;
+        let xz = upX * fy - upY * fx;
+        let xlen = Math.sqrt(xx * xx + xy * xy + xz * xz);
+        if (xlen < 1e-6) { xx = 1; xy = 0; xz = 0; xlen = 1; }
+        xx /= xlen; xy /= xlen; xz /= xlen;
+
+        const yx = fy * xz - fz * xy;
+        const yy = fz * xx - fx * xz;
+        const yz = fx * xy - fy * xx;
+
+        const project = (v) => {
+            const worldX = posX + (v.x * xx + v.y * yx + v.z * fx) * this.size;
+            const worldY = posY + (v.x * xy + v.y * yy + v.z * fy) * this.size;
+            const worldZ = posZ + (v.x * xz + v.y * yz + v.z * fz) * this.size;
+
+            const projScale = fov / (fov + worldZ);
+            return new paper.Point(
+                cx + worldX * projScale,
+                cy + worldY * projScale
+            );
+        };
+
+        const points = this.localVertices.map(project);
 
         this.path.removeSegments();
-        this.path.add(pos.add(tip.rotate(this.angle, [0, 0])));
-        this.path.add(pos.add(backLeft.rotate(this.angle, [0, 0])));
-        this.path.add(pos.add(inner.rotate(this.angle, [0, 0])));
-        this.path.add(pos.add(backRight.rotate(this.angle, [0, 0])));
-        this.path.add(pos.add(tip.rotate(this.angle, [0, 0])));
+        points.forEach(p => this.path.add(p));
         this.path.closed = true;
     }
 
@@ -441,7 +501,7 @@ class AnimationController {
         this.reticle = new Reticle();        
 
         this.activeShots = [];
-        this.reloadTimeSecs = 0.1;
+        this.reloadTimeSecs = 0.25;
         this.reloadTimer = 0;
 
         this.startWave();
@@ -570,12 +630,23 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         keysDown.add('Space');
         controller.net.show();
+
+		window.saveThisText = new paper.PointText(paper.view.center);
+		window.saveThisText.content = 'Hello World';
+		window.saveThisText.style = {
+			fontFamily: 'Courier New',
+			fontWeight: 'bold',
+			fontSize: 20,
+			fillColor: 'red'
+		};
     }
 });
 window.addEventListener('keyup', (e) => {
     if (e.code === 'Space') {
         keysDown.delete('Space');
         controller.net.hide();
+
+		window.saveThisText.remove();
     }
 });
 window.addEventListener('blur', () => {
