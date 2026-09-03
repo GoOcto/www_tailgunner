@@ -1,3 +1,4 @@
+import { sfxr } from "jsfxr";
 import paper from "paper";
 import { Vehicles } from "./assets.js";
 import { gameState, saveHighScore } from "./constants.js";
@@ -6,6 +7,7 @@ import { ExplosionEdge } from "./ExplosionEdge.js";
 import { GameOver } from "./GameOver.js";
 import { Net } from "./Net.js";
 import { Reticle } from "./Reticle.js";
+import { sfxBlaster, sfxBounce, sfxExplode, sfxHyperjump } from "./Sounds.js";
 import { StarField } from "./StarField.js";
 import { StartButton } from "./StartButton.js";
 import { VectorDigits } from "./VectorDigits.js";
@@ -181,6 +183,7 @@ export class AnimationController {
 	}
 	fireWeapon() {
 		if (this.reloadTimer > 0) return;
+		sfxr.toAudio(sfxBlaster).play();
 		const w = paper.view.size.width,
 			h = paper.view.size.height,
 			t = this.reticle.pos;
@@ -256,6 +259,7 @@ export class AnimationController {
 		this.waveTimer = 0;
 	}
 	explodeShip(ship) {
+		if ( gameState.mode!=='demo' ) sfxr.toAudio(sfxExplode).play();
 		ship.getExplosionEdges().forEach((e) => this.explosionEdges.push(new ExplosionEdge(e)));
 		ship.destroy();
 	}
@@ -323,7 +327,10 @@ export class AnimationController {
 			const ship = this.activeShips[i];
 			ship.update(event.delta);
 			if (ship.isPassingThreshold) {
-				if (this.mode === "game" && this.net.group.visible) ship.startRebound();
+				if (this.mode === "game" && this.net.group.visible) {
+					sfxr.toAudio(sfxBounce).play();
+					ship.startRebound();
+				}
 				else if (!ship.counted) {
 					ship.counted = true;
 					if (this.mode === "game") {
@@ -340,9 +347,11 @@ export class AnimationController {
 		if (displayFlag) this.display.rebuild();
 		if (this.hyperJumpTimer === 0 && this.activeShips.length === 0 && this.spawnQueue.length === 0) {
 			if (this.mode === "game" && gameState.ships >= SHIPS_PER_ROUND) {
+				sfxr.toAudio(sfxHyperjump).play();
 				this.hyperJumpTimer = 2;
 				this.starField.speed = this.baseStarfieldSpeed * 5;
 			} else if (gameState.ships > this.waveStartShipsN && this.mode === "game") {
+				sfxr.toAudio(sfxHyperjump).play();
 				this.hyperJumpTimer = 2;
 				this.starField.speed = this.baseStarfieldSpeed * 5;
 			} else this.startWave();

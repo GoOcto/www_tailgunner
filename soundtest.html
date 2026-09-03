@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<title>Sound Test</title>
+		<style>
+			body {
+				font-family: sans-serif;
+				padding: 2rem;
+			}
+			button {
+				margin: 0.5rem;
+				padding: 1rem 1.5rem;
+				font-size: 1rem;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Sound Test</h1>
+		<button id="blaster">Blaster</button>
+		<button id="bounce">Bounce</button>
+		<button id="explode">Explode</button>
+		<button id="hyperjump">Hyperjump</button>
+		<button id="shield">Shield</button>
+
+		<script type="module">
+//import jsfxr from "jsfxr";
+import { sfxr } from "jsfxr";
+import { sfxBlaster, sfxBounce, sfxExplode, sfxHyperjump, sfxShield } from "./src/Sounds.js";
+
+let shieldSoundWave = null;
+let activeShieldSound = null;
+
+let audioCtx = null;
+let fxShieldWav = null;
+
+window.onload = () => {
+	fxShieldWav = sfxr.toAudio(sfxShield);
+	audioCtx = new AudioContext();
+};
+
+document.getElementById("blaster").addEventListener("click", () => {
+	sfxr.toAudio(sfxBlaster).play();
+});
+document.getElementById("bounce").addEventListener("click", () => {
+	sfxr.toAudio(sfxBounce).play();
+});
+document.getElementById("explode").addEventListener("click", () => {
+	sfxr.toAudio(sfxExplode).play();
+});
+document.getElementById("hyperjump").addEventListener("click", () => {
+	sfxr.toAudio(sfxHyperjump).play();
+});
+
+document.getElementById("shield").addEventListener("mousedown", () => {
+    if (!activeShieldSound) {
+        activeShieldSound = sfxr.toAudio(sfxShield); 
+        activeShieldSound.loop = true; // Loop the audio infinitely
+        activeShieldSound.play();      // Start playback
+    }
+});
+
+document.getElementById("shield").addEventListener("mouseup", () => {
+    if (activeShieldSound) {
+        activeShieldSound.pause();         // Stop playback
+        activeShieldSound.currentTime = 0; // Reset to the beginning
+        activeShieldSound = null;
+    }
+});
+
+
+			// document.getElementById("shield").addEventListener("mousedown", () => {
+			// 	if (activeShieldSound) return;
+
+			// 	const source = audioctx.vcreateBufferSource();
+			// 	audioCtx.decodeAudioData(shieldSoundWave.buffer, (buffer) => {
+			// 		source.buffer = buffer;
+			// 		source.loop = true;
+			// 		source.connect(audioCtx.destination);
+			// 		source.start(0);
+
+			// 		activeShieldSound = source; // Store node reference
+			// 	});
+			// });
+			// document.getElementById("shield").addEventListener("mouseup", () => {
+			// 	if (activeShieldSound) {
+			// 		activeShieldSound.stop(); // Stops playback instantly
+			// 		activeShieldSound.disconnect();
+			// 		activeShieldSound = null;
+			// 	}
+			// });
+		</script>
+	</body>
+</html>
