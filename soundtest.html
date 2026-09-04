@@ -21,23 +21,10 @@
 		<button id="bounce">Bounce</button>
 		<button id="explode">Explode</button>
 		<button id="hyperjump">Hyperjump</button>
-		<button id="shield">Shield</button>
-
 		<script type="module">
 //import jsfxr from "jsfxr";
 import { sfxr } from "jsfxr";
 import { sfxBlaster, sfxBounce, sfxExplode, sfxHyperjump } from "./src/Sounds.js";
-
-let shieldSoundWave = null;
-let activeShieldSound = null;
-
-let audioCtx = null;
-let fxShieldWav = null;
-
-window.onload = () => {
-	fxShieldWav = sfxr.toAudio(sfxShield);
-	audioCtx = new AudioContext();
-};
 
 document.getElementById("blaster").addEventListener("click", () => {
 	sfxr.toAudio(sfxBlaster).play();

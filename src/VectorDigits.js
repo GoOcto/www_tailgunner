@@ -1,6 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth, gameState } from "./constants.js";
-import { styleStroke, addVertexDots } from "./VertexHighlight.js";
+import { addVertexDots, styleStroke } from "./VertexHighlight.js";
 
 const DIGITS_DATA = {
 	0: [ [0, 0], [2, 0], [2, 4], [0, 4], [0, 0]	],
@@ -25,6 +25,9 @@ const DIGITS_DATA = {
 	A: [ [0, 4], [0, 1], [1, 0], [2, 1], [2, 4], [2, 2], [0, 2] ],
 	M: [ [0, 4], [0, 0], [1, 2], [2, 0], [2, 4] ],
 	V: [ [0, 0], [1, 4], [2, 0] ],
+	D: [ [0, 4], [0, 0], [1, 0], [2, 1], [2, 3], [1, 4], [0, 4] ],
+	L: [ [0, 0], [0, 4], [2, 4] ],
+	Y: [ [0, 0], [1, 2], [2, 0], [1, 2], [1, 4] ],
 	" ": [],
 };
 
@@ -80,27 +83,33 @@ export class VectorDigits {
 		const rightWidth = right.length * digitW + (right.length - 1) * spacing;
 		this.renderString(right, viewW - padding - rightWidth, sideTop, digitW, digitH, spacing);
 	}
-	rebuildDemo() {
+	rebuildDemo(scores = {}) {
 		this.group.removeChildren();
 		const viewW = paper.view.size.width;
+
 		const labelW = 14, labelH = 22, labelSpacing = 6;
+		const miniW = 8, miniH = 16, miniSpacing = 4;
 		const digitW = 18, digitH = 30, digitSpacing = 8;
-		const labelTop = 6;
-		const numTop = labelTop + labelH + 2 * labelSpacing;
-		const quarterW = viewW / 4;
 
-		const leftLabel = "SCORE";
-		const leftLabelWidth = leftLabel.length * labelW + (leftLabel.length - 1) * labelSpacing;
-		this.renderString(leftLabel, quarterW - leftLabelWidth / 2, labelTop, labelW, labelH, labelSpacing);
-		const leftNum = String(gameState.lastScore).padStart(3, "0");
-		const leftNumWidth = leftNum.length * digitW + (leftNum.length - 1) * digitSpacing;
-		this.renderString(leftNum, quarterW - leftNumWidth / 2, numTop, digitW, digitH, digitSpacing);
+		const labelTop = 10;
+		const miniTop = labelTop + labelH + labelSpacing;
+		const numTop = miniTop + miniH + 2*miniSpacing;
 
-		const rightLabel = "HIGH SCORE";
-		const rightLabelWidth = rightLabel.length * labelW + (rightLabel.length - 1) * labelSpacing;
-		this.renderString(rightLabel, 3 * quarterW - rightLabelWidth / 2, labelTop, labelW, labelH, labelSpacing);
-		const rightNum = String(gameState.highScore).padStart(3, "0");
-		const rightNumWidth = rightNum.length * digitW + (rightNum.length - 1) * digitSpacing;
-		this.renderString(rightNum, 3 * quarterW - rightNumWidth / 2, numTop, digitW, digitH, digitSpacing);
+		const columns = [
+			{ label: "SCORE", mini: "", value: gameState.lastScore, center: viewW / 6 },
+			{ label: "HIGH SCORE", mini: "ALL TIME", value: Number(scores["ever"]) || 0, center: viewW / 2 },
+			{ label: "HIGH SCORE", mini: "30 DAY", value: Number(scores["30d"]) || 0, center: (5 * viewW) / 6 },
+		];
+		for (const col of columns) {
+			const labelWidth = col.label.length * labelW + (col.label.length - 1) * labelSpacing;
+			this.renderString(col.label, col.center - labelWidth / 2, labelTop, labelW, labelH, labelSpacing);
+
+			const miniWidth = col.mini.length * miniW + (col.mini.length - 1) * miniSpacing;
+			this.renderString(col.mini, col.center - miniWidth / 2, miniTop, miniW, miniH, miniSpacing);
+
+			const num = String(col.value).padStart(3, "0");
+			const numWidth = num.length * digitW + (num.length - 1) * digitSpacing;
+			this.renderString(num, col.center - numWidth / 2, numTop, digitW, digitH, digitSpacing);
+		}
 	}
 }

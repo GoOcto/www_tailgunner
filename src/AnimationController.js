@@ -1,10 +1,11 @@
 import { sfxr } from "jsfxr";
 import paper from "paper";
 import { Vehicles } from "./assets.js";
-import { gameState, saveHighScore } from "./constants.js";
+import { gameState } from "./constants.js";
 import { DeltaShot } from "./DeltaShot.js";
 import { ExplosionEdge } from "./ExplosionEdge.js";
 import { GameOver } from "./GameOver.js";
+import { retrieveHighScores, saveHighScore } from "./HighScores.js";
 import { Net } from "./Net.js";
 import { Reticle } from "./Reticle.js";
 import { sfxBlaster, sfxBounce, sfxExplode, sfxHyperjump } from "./Sounds.js";
@@ -130,7 +131,9 @@ export class AnimationController {
 		this.reticle.group.visible = true;
 		this.startButton.hide();
 		this.gameOver.hide();
-		this.display.rebuildDemo();
+		retrieveHighScores().then((scores) => {
+			this.display.rebuildDemo(scores);
+		});
 	}
 	startGame() {
 		gameState.score = 0;
@@ -162,7 +165,7 @@ export class AnimationController {
 	endGameRound() {
 		gameState.lastScore = gameState.score;
 		gameState.highScore = Math.max(gameState.highScore, gameState.score);
-		saveHighScore();
+		saveHighScore(gameState.score);
 		this.mode = "gameOver";
 		gameState.mode = this.mode;
 		this.gameOverTimer = GAME_OVER_SECS;
@@ -171,6 +174,7 @@ export class AnimationController {
 		this.canvas.style.cursor = "default";
 		this.isFiring = false;
 		this.net.hide();
+		this.clearActiveEntities();
 		this.reticle.group.visible = false;
 		this.starField.speed = this.baseStarfieldSpeed * GAME_OVER_STARFIELD_SPEED_MULTIPLIER;
 		this.gameOver.show();
