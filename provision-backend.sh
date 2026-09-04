@@ -197,7 +197,7 @@ export const handler = async (event) => {
   if (method === "POST") {
     try {
       const body = JSON.parse(event.body || "{}");
-      const { score, scope, ttl } = body;
+      const { score, scope, ttl, datetime } = body;
       if (typeof score !== "number" || score <= 0) {
         return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: "Invalid score" }) };
       }
@@ -208,6 +208,7 @@ export const handler = async (event) => {
         scope: { S: scope },
         id: { S: `${Date.now()}#${crypto.randomUUID()}` },
         score: { N: String(score) },
+        datetime: { S: datetime || new Date().toISOString() },
       };
       if (typeof ttl === "number" && ttl > 0) {
         item.ttl = { N: String(ttl) };
@@ -228,9 +229,9 @@ export const handler = async (event) => {
         const resp = await db.send(new QueryCommand({
           TableName: TABLE,
           KeyConditionExpression: "#s = :s",
-          ExpressionAttributeNames: { "#s": "scope" },
+          ExpressionAttributeNames: { "#s": "scope", "#sc": "score" },
           ExpressionAttributeValues: { ":s": { S: dynamoScope } },
-          ProjectionExpression: "score",
+          ProjectionExpression: "#sc",
         }));
         const scores = (resp.Items || []).map((i) => parseInt(i.score.N, 10));
         result[scope] = scores.length > 0 ? Math.max(...scores) : 0;
@@ -384,6 +385,10 @@ echo ""
 echo "Set this in src/HighScores.js:"
 echo "  const API_ENDPOINT = \"${API_ID}.execute-api.${REGION}.amazonaws.com/prod\";"
 echo ""
-echo "Test it:"
-echo "  curl -X POST $ENDPOINT/scores -H 'Content-Type: application/json' -d '{\"score\":100,\"scope\":\"30d\",\"ttl\":9999999999}'"
+echo "Test it (bash/macOS/Linux):"
+echo "  curl -X POST $ENDPOINT/scores -H 'Content-Type: application/json' -d '{\"score\":100,\"scope\":\"30d\",\"ttl\":9999999999,\"datetime\":\"2026-09-04T11:00:00Z\"}'"
 echo "  curl $ENDPOINT/scores"
+echo ""
+echo "Test it (Windows PowerShell -- curl.exe mangles single/double quotes, use curl.exe with a file or Invoke-RestMethod instead):"
+echo "  Invoke-RestMethod -Method Post -Uri '$ENDPOINT/scores' -ContentType 'application/json' -Body '{\"score\":100,\"scope\":\"30d\",\"ttl\":9999999999,\"datetime\":\"2026-09-04T11:00:00Z\"}'"
+echo "  Invoke-RestMethod -Uri '$ENDPOINT/scores'"
