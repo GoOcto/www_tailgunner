@@ -5,7 +5,9 @@ A browser-based fan recreation of the 1979 Vectorbeam arcade classic **Tailgunne
 Play it in your browser here:
 **[https://goocto.itch.io/tailgunner](https://goocto.itch.io/tailgunner)**
 
-<iframe src="https://goocto.com/tailgunner" width="640" height="480" frameborder="0"></iframe>
+<p align="center">
+  <img src="./screenshot.png" alt="Screenshot" width="320" height="240" />
+</p>
 
 ## About
 
