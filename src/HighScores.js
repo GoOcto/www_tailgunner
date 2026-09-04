@@ -42,12 +42,12 @@ export async function saveHighScore(score) {
       await fetch(`${API_URL}/scores`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score, scope: "30d", ttl })
+        body: JSON.stringify({ score, scope: "30d", ttl, datetime: new Date().toISOString() })
       });
       await fetch(`${API_URL}/scores`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ score, scope: "alltime" })
+        body: JSON.stringify({ score, scope: "alltime", datetime: new Date().toISOString() })
       });
     } catch (err) {
       console.warn("Could not save high score to backend, using local fallback:", err);
