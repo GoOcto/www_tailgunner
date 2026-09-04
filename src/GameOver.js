@@ -1,6 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
-import { renderVectorString } from "./VectorDigits.js";
+import { renderVectorString } from "./TextDisplay.js";
 import { addVertexDots, styleStroke } from "./VertexHighlight.js";
 
 export class GameOver {

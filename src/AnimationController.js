@@ -11,7 +11,7 @@ import { Reticle } from "./Reticle.js";
 import { sfxBlaster, sfxBounce, sfxExplode, sfxHyperjump } from "./Sounds.js";
 import { StarField } from "./StarField.js";
 import { StartButton } from "./StartButton.js";
-import { VectorDigits } from "./VectorDigits.js";
+import { TextDisplay } from "./TextDisplay.js";
 import { VectorStarfighter } from "./VectorStarfighter.js";
 
 const SHIPS_PER_ROUND = 10;
@@ -31,7 +31,7 @@ export class AnimationController {
 		this.canvas = canvas;
 		this.starField = new StarField();
 		this.starField.create(200);
-		this.display = new VectorDigits();
+		this.display = new TextDisplay();
 		this.activeShips = [];
 		this.spawnQueue = [];
 		this.waveTimer = 0;

@@ -1,7 +1,7 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
-import { renderVectorString } from "./VectorDigits.js";
-import { styleStroke, addVertexDots } from "./VertexHighlight.js";
+import { renderVectorString } from "./TextDisplay.js";
+import { addVertexDots, styleStroke } from "./VertexHighlight.js";
 
 const TIMEOUT_SECS = 60;
 const FADE_SECS = 1;

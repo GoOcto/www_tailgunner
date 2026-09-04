@@ -54,7 +54,7 @@ export function renderVectorString(group, str, startX, startY, digitWidth = 20, 
 	}
 }
 
-export class VectorDigits {
+export class TextDisplay {
 	constructor() {
 		this.group = new paper.Group();
 		this.rebuild();
@@ -75,7 +75,7 @@ export class VectorDigits {
 		const left = String(gameState.score);
 		this.renderString(left, padding, sideTop, digitW, digitH, spacing);
 
-		const center = String(Math.floor(gameState.energy));
+		const center = String(Math.ceil(gameState.energy));
 		const centerWidth = center.length * digitW + (center.length - 1) * spacing;
 		this.renderString(center, (viewW - centerWidth) / 2, midTop, digitW, digitH, spacing);
 
@@ -88,28 +88,31 @@ export class VectorDigits {
 		const viewW = paper.view.size.width;
 
 		const labelW = 14, labelH = 22, labelSpacing = 6;
-		const miniW = 8, miniH = 16, miniSpacing = 4;
+		const miniW = 6, miniH = 12, miniSpacing = 4;
 		const digitW = 18, digitH = 30, digitSpacing = 8;
 
 		const labelTop = 10;
-		const miniTop = labelTop + labelH + labelSpacing;
-		const numTop = miniTop + miniH + 2*miniSpacing;
+		const numTop = labelTop + labelH + 2*labelSpacing;
+		const miniTop = numTop + (digitH-miniH);
 
+		const score30d  = Number(scores["30d"]) || 0;
+		const scoreever = Number(scores["ever"]) || 0;
+		
 		const columns = [
 			{ label: "SCORE", mini: "", value: gameState.lastScore, center: viewW / 6 },
-			{ label: "HIGH SCORE", mini: "ALL TIME", value: Number(scores["ever"]) || 0, center: viewW / 2 },
-			{ label: "HIGH SCORE", mini: "30 DAY", value: Number(scores["30d"]) || 0, center: (5 * viewW) / 6 },
+			{ label: "HIGH SCORE", mini: "ALL TIME", value: scoreever, center: viewW / 2 },
+			{ label: "HIGH SCORE", mini: "30 DAY", value: score30d, center: (5 * viewW) / 6 },
 		];
 		for (const col of columns) {
 			const labelWidth = col.label.length * labelW + (col.label.length - 1) * labelSpacing;
-			this.renderString(col.label, col.center - labelWidth / 2, labelTop, labelW, labelH, labelSpacing);
-
-			const miniWidth = col.mini.length * miniW + (col.mini.length - 1) * miniSpacing;
-			this.renderString(col.mini, col.center - miniWidth / 2, miniTop, miniW, miniH, miniSpacing);
+			this.renderString(col.label, col.center - labelWidth/2, labelTop, labelW, labelH, labelSpacing);
 
 			const num = String(col.value).padStart(3, "0");
 			const numWidth = num.length * digitW + (num.length - 1) * digitSpacing;
-			this.renderString(num, col.center - numWidth / 2, numTop, digitW, digitH, digitSpacing);
+			this.renderString(num, col.center - numWidth/2, numTop, digitW, digitH, digitSpacing);
+
+			const miniWidth = col.mini.length * miniW + (col.mini.length - 1) * miniSpacing;
+			this.renderString(col.mini, col.center + numWidth/2 + 2*miniW, miniTop, miniW, miniH, miniSpacing);
 		}
 	}
 }
