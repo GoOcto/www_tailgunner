@@ -1,6 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
-import { styleStroke, addVertexDots, updateVertexDots, setVertexDotsOpacity } from "./VertexHighlight.js";
+import { addVertexDots, setVertexDotsOpacity, styleStroke, updateVertexDots } from "./VertexHighlight.js";
 export class ExplosionEdge {
 	constructor(edge) {
 		this.center = edge.p1.add(edge.p2).divide(2);

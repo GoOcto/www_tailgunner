@@ -14,8 +14,8 @@ import { VectorDigits } from "./VectorDigits.js";
 import { VectorStarfighter } from "./VectorStarfighter.js";
 
 const SHIPS_PER_ROUND = 10;
-const DEMO_SHOT_MIN_INTERVAL = 0.6;
-const DEMO_SHOT_MAX_INTERVAL = 2.2;
+const DEMO_SHOT_MIN_INTERVAL = 0.25;
+const DEMO_SHOT_MAX_INTERVAL = 1.8;
 const POST_GAME_CLICK_LOCKOUT_SECS = 10;
 const GAME_OVER_SECS = 10;
 const GAME_OVER_STARFIELD_SPEED_MULTIPLIER = 0.1;
@@ -36,7 +36,7 @@ export class AnimationController {
 		this.waveTimer = 0;
 		this.waveStartShipsN = gameState.ships;
 		this.hyperJumpTimer = 0;
-		this.baseStarfieldSpeed = this.starField.speed;
+		this.baseStarfieldSpeed = 40;
 		this.net = new Net();
 		this.reticle = new Reticle();
 		this.activeShots = [];
@@ -178,6 +178,7 @@ export class AnimationController {
 	}
 	finishGameOver(skipLockout = false) {
 		if (skipLockout) this.clickLockoutTimer = 0;
+		this.clearActiveEntities();
 		this.enterDemoMode();
 		this.startWave();
 	}
@@ -253,7 +254,7 @@ export class AnimationController {
 		this.spawnQueue = [];
 		let t = 0;
 		for (let i = 0; i < 3; i++) {
-			t += 0.03 + 0.1 * Math.random();
+			t += 0.03 + 0.4 * Math.random()*Math.random();
 			this.spawnQueue.push({ delay: t, speed, model });
 		}
 		this.waveTimer = 0;
