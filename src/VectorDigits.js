@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth, gameState } from "./constants.js";
+import { styleStroke, addVertexDots } from "./VertexHighlight.js";
 
 const DIGITS_DATA = {
 	0: [ [0, 0], [2, 0], [2, 4], [0, 4], [0, 0]	],
@@ -42,7 +43,9 @@ export function renderVectorString(group, str, startX, startY, digitWidth = 20, 
 				new paper.Point(startX + i * (digitWidth + spacing) + pt[0] * scaleX, startY + pt[1] * scaleY),
 			);
 		});
+		styleStroke(path);
 		group.addChild(path);
+		addVertexDots(group, path.segments.map((s) => s.point));
 	}
 }
 

@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
+import { styleStroke, addVertexDots, updateVertexDots } from "./VertexHighlight.js";
 export class DeltaShot {
 	constructor(startScreenPoint, targetScreenPoint) {
 		const cx = paper.view.size.width / 2,
@@ -20,6 +21,9 @@ export class DeltaShot {
 			{ x: 0.5, y: 0, z: -0.6 },
 		];
 		this.path = new paper.Path({ strokeColor: new paper.Color(beamColor), strokeWidth: beamWidth, closed: true });
+		styleStroke(this.path);
+		this.vertexGroup = new paper.Group();
+		this.vertexDots = addVertexDots(this.vertexGroup, this.localVertices.map(() => paper.view.center));
 		this.rebuild();
 	}
 	rebuild() {
@@ -63,6 +67,7 @@ export class DeltaShot {
 		this.path.removeSegments();
 		this.localVertices.forEach((v) => this.path.add(project(v)));
 		this.path.closed = true;
+		updateVertexDots(this.vertexDots, this.path.segments.map((seg) => seg.point));
 	}
 	update(deltaTime) {
 		this.progress += deltaTime / this.duration;
@@ -76,5 +81,6 @@ export class DeltaShot {
 	}
 	destroy() {
 		this.path.remove();
+		this.vertexGroup.remove();
 	}
 }

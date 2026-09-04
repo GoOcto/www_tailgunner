@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
+import { addVertexDots, styleStroke } from "./VertexHighlight.js";
 export class Reticle {
 	constructor() {
 		this.group = new paper.Group();
@@ -18,6 +19,7 @@ export class Reticle {
 			strokeColor: color,
 			strokeWidth: beamWidth,
 		});
+		styleStroke(axes);
 		const ticks = [];
 		[
 			{ pos: 10, len: 12 },
@@ -28,10 +30,30 @@ export class Reticle {
 				ticks.push(new paper.Path.Line(c.add([t.pos * d, -t.len / 2]), c.add([t.pos * d, t.len / 2])));
 			}),
 		);
-		this.group.addChildren([axes, new paper.CompoundPath({ children: ticks, strokeColor: color, strokeWidth: beamWidth })]);
+		const ticksPath = new paper.CompoundPath({ 
+			children: ticks, 
+			strokeColor: color, 
+			strokeWidth: beamWidth 
+		});
+		styleStroke(ticksPath);
+		this.group.addChildren([axes, ticksPath]);
+		const vertexPoints = [
+			c.add([0, -30]), c.add([0, 30]), c.add([-30, 0]), c.add([30, 0]),
+		];
+		[
+			{ pos: 10, len: 12 },
+			{ pos: 20, len: 24 },
+		].forEach((t) =>
+			[1, -1].forEach((d) => {
+				vertexPoints.push(c.add([-t.len / 2, t.pos * d]), c.add([t.len / 2, t.pos * d]));
+				vertexPoints.push(c.add([t.pos * d, -t.len / 2]), c.add([t.pos * d, t.len / 2]));
+			}),
+		);
+		addVertexDots(this.group, vertexPoints);
 	}
 	moveTo(point) {
 		this.pos = point.clone();
 		this.group.position = point;
 	}
 }
+

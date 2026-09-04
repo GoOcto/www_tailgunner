@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
+import { styleStroke, addVertexDots, updateVertexDots, setVertexDotsOpacity } from "./VertexHighlight.js";
 export class ExplosionEdge {
 	constructor(edge) {
 		this.center = edge.p1.add(edge.p2).divide(2);
@@ -21,6 +22,10 @@ export class ExplosionEdge {
 			strokeWidth: beamWidth,
 			opacity: edge.opacity,
 		});
+		styleStroke(this.path, edge.opacity);
+		this.vertexGroup = new paper.Group();
+		this.vertexDots = addVertexDots(this.vertexGroup, [edge.p1, edge.p2]);
+		setVertexDotsOpacity(this.vertexDots, edge.opacity);
 	}
 	update(deltaTime) {
 		this.age += deltaTime;
@@ -28,7 +33,10 @@ export class ExplosionEdge {
 		this.angle += this.angularVelocity * deltaTime;
 		this.path.segments[0].point = this.center.add(this.localP1.rotate(this.angle));
 		this.path.segments[1].point = this.center.add(this.localP2.rotate(this.angle));
-		this.path.opacity = this.initialOpacity * Math.max(0, 1 - this.age / this.duration);
+		const fade = Math.max(0, 1 - this.age / this.duration);
+		styleStroke(this.path, this.initialOpacity * fade);
+		updateVertexDots(this.vertexDots, this.path.segments.map((s) => s.point));
+		setVertexDotsOpacity(this.vertexDots, this.initialOpacity * fade);
 		if (this.age >= this.duration) {
 			this.destroy();
 			return true;
@@ -37,5 +45,6 @@ export class ExplosionEdge {
 	}
 	destroy() {
 		this.path.remove();
+		this.vertexGroup.remove();
 	}
 }

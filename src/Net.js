@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
+import { styleStroke, addVertexDots } from "./VertexHighlight.js";
 export class Net {
 	constructor() {
 		this.group = new paper.Group();
@@ -25,7 +26,9 @@ export class Net {
 				p.add(new paper.Point(col * cell + cell, shift + row * cell + 0.5 * cell));
 				p.add(new paper.Point(col * cell + 0.5 * cell, shift + row * cell + cell));
 				p.add(new paper.Point(col * cell, shift + row * cell + 0.5 * cell));
+				styleStroke(p, 0.65);
 				this.group.addChild(p);
+				addVertexDots(this.group, p.segments.map((s) => s.point));
 			}
 	}
 	show() {

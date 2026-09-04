@@ -1,5 +1,6 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
+import { addVertexDots, setVertexDotsOpacity, setVertexDotsVisible, styleStroke, updateVertexDots } from "./VertexHighlight.js";
 
 export class VectorStarfighter {
 	constructor(modelData, scale, waveSpeed = null) {
@@ -7,10 +8,15 @@ export class VectorStarfighter {
 		this.edges = modelData.edges;
 		this.scale = scale;
 		this.lines = [];
+		this.vertexGroup = new paper.Group();
+		this.vertexDots = [];
 		this.visibleEdges = [];
 		this.projectedBounds = null;
 		this.time = 5 * Math.random();
-		this.edges.forEach(() => this.lines.push(new paper.Path.Line({ strokeColor: beamColor, strokeWidth: beamWidth })));
+		this.edges.forEach(() => {
+			this.lines.push(new paper.Path.Line({ strokeColor: beamColor, strokeWidth: beamWidth }));
+			this.vertexDots.push(addVertexDots(this.vertexGroup, [paper.view.center, paper.view.center]));
+		});
 		this.spiralSpeed = Math.random() * 0.5 + 0.6;
 		if (Math.random() < 0.5) this.spiralSpeed *= -1;
 		this.zSpeed = waveSpeed !== null ? waveSpeed : Math.random() * 10 + 10;
@@ -20,12 +26,13 @@ export class VectorStarfighter {
 		this.spread = 800 + 800 * Math.random();
 		this.centerX = (Math.random() - 0.5) * 500;
 		this.centerY = (Math.random() - 0.5) * 500;
-		this.justPassedCamera = false;
+		this.isPassingThreshold = false;
 		this.counted = false;
 		this.rebound = null;
 	}
 	destroy() {
 		this.lines.forEach((line) => line.remove());
+		this.vertexGroup.remove();
 	}
 	containsReticle(point, padding = 24) {
 		const b = this.projectedBounds;
@@ -56,7 +63,7 @@ export class VectorStarfighter {
 	}
 	update(deltaTime) {
 		this.time += deltaTime;
-		this.justPassedCamera = false;
+		this.isPassingThreshold = false;
 		const cx = paper.view.size.width / 2,
 			cy = paper.view.size.height / 2,
 			fov = 300,
@@ -69,7 +76,7 @@ export class VectorStarfighter {
 			this.z += this.rebound.speed * deltaTime * 60;
 		} else {
 			this.z -= this.zSpeed;
-			this.justPassedCamera = previousZ > 0 && this.z <= 0;
+			this.isPassingThreshold = previousZ > 125 && this.z <= 125;
 		}
 		const radius = (z) => ((z - this.pinchZ) / 1000) ** 2 * this.spread + this.minRadius;
 		let nextX, nextY, nextZ;
@@ -165,11 +172,17 @@ export class VectorStarfighter {
 				const opacity = this.rebound
 					? Math.max(0, 1 - this.rebound.age / this.rebound.duration)
 					: Math.max(0.1, 1 - this.z / 5000);
-				this.lines[index].opacity = opacity;
+				styleStroke(this.lines[index], opacity);
 				this.visibleEdges.push({ p1, p2, opacity });
 				addBounds(p1);
 				addBounds(p2);
-			} else this.lines[index].visible = false;
+				updateVertexDots(this.vertexDots[index], [p1, p2]);
+				setVertexDotsVisible(this.vertexDots[index], true);
+				setVertexDotsOpacity(this.vertexDots[index], opacity);
+			} else {
+				this.lines[index].visible = false;
+				setVertexDotsVisible(this.vertexDots[index], false);
+			}
 		});
 	}
 }

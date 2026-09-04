@@ -1,6 +1,7 @@
 import paper from "paper";
 import { beamColor, beamWidth } from "./constants.js";
 import { renderVectorString } from "./VectorDigits.js";
+import { styleStroke, addVertexDots } from "./VertexHighlight.js";
 
 const TIMEOUT_SECS = 60;
 const FADE_SECS = 1;
@@ -25,7 +26,9 @@ export class StartButton {
 			strokeColor: beamColor,
 			strokeWidth: beamWidth,
 		});
+		styleStroke(box);
 		this.group.addChild(box);
+		addVertexDots(this.group, box.segments.map((s) => s.point));
 
 		if (this.hover) {
 			const bzl = new paper.Path.Rectangle({
@@ -33,7 +36,9 @@ export class StartButton {
 				strokeColor: beamColor,
 				strokeWidth: beamWidth,
 			});
+			styleStroke(bzl);
 			this.group.addChild(bzl);
+			addVertexDots(this.group, bzl.segments.map((s) => s.point));
 		}
 
 		const label = "START";
